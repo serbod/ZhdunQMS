@@ -1,0 +1,31 @@
+object FormMonitor: TFormMonitor
+  Left = 430
+  Height = 365
+  Top = 217
+  Width = 526
+  Caption = 'Zhdun QMS'
+  ClientHeight = 365
+  ClientWidth = 526
+  OnResize = FormResize
+  LCLVersion = '2.0.10.0'
+  object PaintBox: TPaintBox
+    Left = 0
+    Height = 365
+    Top = 0
+    Width = 526
+    Align = alClient
+    OnPaint = PaintBoxPaint
+  end
+  object Timer1000ms: TTimer
+    OnTimer = Timer1000msTimer
+    Left = 240
+    Top = 77
+  end
+  object LUDPComponent1: TLUDPComponent
+    Port = 4444
+    OnReceive = LUDPComponent1Receive
+    Timeout = 0
+    Left = 243
+    Top = 211
+  end
+end

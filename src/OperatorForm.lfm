@@ -1,0 +1,72 @@
+object FormOperator: TFormOperator
+  Left = 597
+  Height = 139
+  Top = 254
+  Width = 386
+  Caption = 'Zhdun'
+  ClientHeight = 139
+  ClientWidth = 386
+  LCLVersion = '2.0.10.0'
+  object Button1: TButton
+    Left = 8
+    Height = 25
+    Top = 48
+    Width = 124
+    Action = actNextTicket
+    TabOrder = 0
+  end
+  object TrayIcon: TTrayIcon
+    PopUpMenu = pmTray
+    Visible = True
+    Left = 153
+    Top = 91
+  end
+  object alOperator: TActionList
+    Left = 157
+    Top = 26
+    object actNextTicket: TAction
+      Caption = 'Next visitor!'
+      OnExecute = actNextTicketExecute
+    end
+    object actPause: TAction
+      Caption = 'Pause'
+      OnExecute = actPauseExecute
+    end
+    object actSettings: TAction
+      Caption = 'Settings'
+    end
+    object actExit: TAction
+      Caption = 'Exit'
+      OnExecute = actExitExecute
+    end
+  end
+  object pmTray: TPopupMenu
+    Left = 232
+    Top = 27
+    object MenuItem1: TMenuItem
+      Action = actNextTicket
+    end
+    object MenuItem3: TMenuItem
+      Caption = '-'
+    end
+    object MenuItem2: TMenuItem
+      Action = actPause
+    end
+    object MenuItem4: TMenuItem
+      Action = actSettings
+    end
+    object MenuItem6: TMenuItem
+      Caption = '-'
+    end
+    object MenuItem5: TMenuItem
+      Action = actExit
+    end
+  end
+  object UDPConn: TLUDPComponent
+    Port = 0
+    OnReceive = UDPConnReceive
+    Timeout = 0
+    Left = 232
+    Top = 90
+  end
+end

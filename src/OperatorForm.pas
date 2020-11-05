@@ -19,6 +19,12 @@ type
     actNextTicket: TAction;
     alOperator: TActionList;
     Button1: TButton;
+    lbTotalTickets: TLabel;
+    lbTotalTicketsLabel: TLabel;
+    lbCurTicket: TLabel;
+    lbCurTicketLabel: TLabel;
+    Timer1s: TTimer;
+    Timer100ms: TTimer;
     UDPConn: TLUDPComponent;
     MenuItem1: TMenuItem;
     MenuItem2: TMenuItem;
@@ -31,6 +37,8 @@ type
     procedure actExitExecute(Sender: TObject);
     procedure actNextTicketExecute(Sender: TObject);
     procedure actPauseExecute(Sender: TObject);
+    procedure Timer100msTimer(Sender: TObject);
+    procedure Timer1sTimer(Sender: TObject);
     procedure UDPConnReceive(aSocket: TLSocket);
   private
     FOperatorManager: TOperatorManager;
@@ -47,6 +55,12 @@ var
 implementation
 
 {$R *.lfm}
+
+procedure UpdateLabel(ALabel: TLabel; const AText: string);
+begin
+  if ALabel.Caption <> AText then
+    ALabel.Caption := AText;
+end;
 
 { TFormOperator }
 
@@ -65,6 +79,24 @@ begin
   FOperatorManager.Pause();
 end;
 
+procedure TFormOperator.Timer100msTimer(Sender: TObject);
+begin
+  UpdateLabel(lbCurTicket, IntToStr(FOperatorManager.Office.TicketNum));
+  UpdateLabel(lbTotalTickets, IntToStr(FOperatorManager.Office.TicketCount));
+end;
+
+procedure TFormOperator.Timer1sTimer(Sender: TObject);
+begin
+  if FOperatorManager.NeedUpdateInfo then
+  begin
+    FOperatorManager.PostCmd('INFO_REQ');
+  end
+  else
+  begin
+    FOperatorManager.PostCmd('STATE_REQ');
+  end;
+end;
+
 procedure TFormOperator.UDPConnReceive(aSocket: TLSocket);
 var
   s: string;
@@ -79,7 +111,7 @@ begin
   Assert(Length(S) <= 500);
   if Length(S) <= 500 then
   begin
-    UdpConn.SendMessage(S, FOperatorManager.MonitorHost);
+    UdpConn.SendMessage(S, FOperatorManager.MonitorHost + ':' + IntToStr(FOperatorManager.MonitorPort));
   end;
 end;
 
@@ -95,7 +127,7 @@ begin
 
   TrayIcon.Icon.Assign(Application.Icon);
 
-  FOperatorManager.PostCmd(Format('OFFICE %d: INFO_REQ', [FOperatorManager.Office.Num]));
+  FOperatorManager.PostCmd('INFO_REQ');
 end;
 
 procedure TFormOperator.BeforeDestruction;

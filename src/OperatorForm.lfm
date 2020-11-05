@@ -8,12 +8,52 @@ object FormOperator: TFormOperator
   ClientWidth = 386
   LCLVersion = '2.0.10.0'
   object Button1: TButton
-    Left = 8
+    Left = 15
     Height = 25
-    Top = 48
+    Top = 72
     Width = 124
     Action = actNextTicket
     TabOrder = 0
+  end
+  object lbCurTicketLabel: TLabel
+    Left = 15
+    Height = 15
+    Top = 10
+    Width = 72
+    Caption = 'Current ticket'
+    ParentColor = False
+  end
+  object lbCurTicket: TLabel
+    Left = 15
+    Height = 30
+    Top = 32
+    Width = 63
+    Caption = 'A1234'
+    Font.Color = clBlue
+    Font.Height = -21
+    Font.Style = [fsBold]
+    ParentColor = False
+    ParentFont = False
+  end
+  object lbTotalTicketsLabel: TLabel
+    Left = 128
+    Height = 15
+    Top = 10
+    Width = 64
+    Caption = 'Total tickets'
+    ParentColor = False
+  end
+  object lbTotalTickets: TLabel
+    Left = 128
+    Height = 30
+    Top = 32
+    Width = 48
+    Caption = '1234'
+    Font.Color = clGreen
+    Font.Height = -21
+    Font.Style = [fsBold]
+    ParentColor = False
+    ParentFont = False
   end
   object TrayIcon: TTrayIcon
     PopUpMenu = pmTray
@@ -67,6 +107,17 @@ object FormOperator: TFormOperator
     OnReceive = UDPConnReceive
     Timeout = 0
     Left = 232
+    Top = 90
+  end
+  object Timer100ms: TTimer
+    Interval = 100
+    OnTimer = Timer100msTimer
+    Left = 306
+    Top = 32
+  end
+  object Timer1s: TTimer
+    OnTimer = Timer1sTimer
+    Left = 306
     Top = 90
   end
 end

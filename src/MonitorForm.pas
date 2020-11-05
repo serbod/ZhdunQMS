@@ -94,8 +94,8 @@ procedure TFormMonitor.LUDPComponent1Receive(aSocket: TLSocket);
 var
   s, sHostPort: string;
 begin
-  sHostPort := aSocket.PeerAddress + ':' + IntToStr(aSocket.PeerPort);
   aSocket.GetMessage(s);
+  sHostPort := aSocket.PeerAddress + ':' + IntToStr(aSocket.PeerPort);
   if s <> '' then
     FTicketManager.ProcessCmd(s, sHostPort);
 end;
@@ -181,6 +181,7 @@ end; }
 procedure TFormMonitor.DrawTicket(AC: TCanvas; const ATicket: TVisualTicket);
 var
   r: TRect;
+  s: string;
 begin
   // frame
   AC.DrawingMode := dmAlphaBlend;
@@ -226,6 +227,7 @@ begin
   FTicketManager := TTicketManager.Create;
   FTicketManager.MaxVisTickets := 6;
   FTicketManager.TicketBorderSize := 5;
+  FTicketManager.UDPPort := 4444;
   FTicketManager.OnSendCmd := @OnSendCmdHandler;
 
   FTicketManager.LoadConfig();
@@ -245,6 +247,8 @@ begin
   else
     FBGFileName := '';
 
+
+  LUDPComponent1.Listen(FTicketManager.UDPPort);
 
   TestTickets();
 end;

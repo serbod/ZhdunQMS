@@ -657,7 +657,7 @@ begin
   n := Pos(WordSeparator, AStr);
   if n = 0 then n := MaxInt-1;
   Result := Copy(AStr, 1, n-1);
-  AStr := Copy(AStr, n+1, MaxInt);
+  AStr := Copy(AStr, n+Length(WordSeparator), MaxInt);
 end;
 
 function PosEx(const SubStr, S: string; Offset: Cardinal = 1): Integer;

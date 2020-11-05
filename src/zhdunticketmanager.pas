@@ -26,6 +26,8 @@ type
     TicketBorderSize: Integer;
     MaxVisTickets: Integer;
 
+    UDPPort: Integer;
+
     procedure AfterConstruction; override;
     procedure BeforeDestruction; override;
 
@@ -75,6 +77,7 @@ begin
     sSection := 'Main';
     MaxVisTickets := ini.ReadInteger(sSection, 'MaxVisTickets', MaxVisTickets);
     TicketBorderSize := ini.ReadInteger(sSection, 'TicketBorderSize', TicketBorderSize);
+    UDPPort := ini.ReadInteger(sSection, 'UDPPort', UDPPort);
 
     // Office list
     n := ini.ReadInteger(sSection, 'OfficeCount', 0);
@@ -85,6 +88,7 @@ begin
         Continue;
 
       OfficeItem.Init();
+      OfficeItem.Num := ini.ReadInteger(sSection, 'Num', OfficeItem.Num);
       OfficeItem.Caption := ini.ReadString(sSection, 'Caption', OfficeItem.Caption);
       OfficeItem.Comment := ini.ReadString(sSection, 'Comment', OfficeItem.Comment);
       OfficeItem.IconName := ini.ReadString(sSection, 'IconName', OfficeItem.IconName);
@@ -109,10 +113,11 @@ begin
   ini := TMemIniFile.Create('zhdun.ini');
   try
     sSection := 'Main';
-    ini.WriteInteger(sSection, 'OfficeCount', OfficeList.GetCount());
     ini.WriteInteger(sSection, 'MaxVisTickets', MaxVisTickets);
     ini.WriteInteger(sSection, 'TicketBorderSize', TicketBorderSize);
+    ini.WriteInteger(sSection, 'UDPPort', UDPPort);
 
+    ini.WriteInteger(sSection, 'OfficeCount', OfficeList.GetCount());
     i := 0;
     n := 0;
     while OfficeList.GetByIndex(i) <> nil do
@@ -122,6 +127,7 @@ begin
       begin
         Inc(n);
         sSection := 'Office_' + IntToStr(n+1);
+        ini.WriteInteger(sSection, 'Num', pOfficeItem^.Num);
         ini.WriteString(sSection, 'Caption', pOfficeItem^.Caption);
         ini.WriteString(sSection, 'Comment', pOfficeItem^.Comment);
         ini.WriteString(sSection, 'IconName', pOfficeItem^.IconName);
@@ -209,6 +215,10 @@ begin
     TmpVisualTicket.OfficeText := pTmpOffice^.Caption;
     TmpVisualTicket.TicketText := pTmpTicket^.Caption;
 
+    if pTmpOffice^.TicketCount > 1 then
+      TmpVisualTicket.TicketText := TmpVisualTicket.TicketText + Format(
+        '  (+%d)', [pTmpOffice^.TicketCount]);
+
     TmpVisualTicket.Pos := NextPos;
     TmpVisualTicket.Size := TicketSize;
 
@@ -223,8 +233,9 @@ procedure TTicketManager.UpdateOfficesStates();
 var
   OfficeIterator: TOfficeListIterator;
   pTmpOffice: POffice;
-  //pTmpTicket: PTicket;
+  pTmpTicket: PTicket;
   s: string;
+  i, TmpTicketCount: Integer;
 begin
   OfficeIterator.Init(OfficeList);
   while OfficeIterator.Next(pTmpOffice) do
@@ -232,8 +243,28 @@ begin
     if pTmpOffice^.State in [osUndef, osOff] then
       Continue;
 
-    // OFFICE <office_num>: STATE <tickets_count> [ticket_num]
-    s := Format('OFFICE %d: STATE %d', [pTmpOffice^.Num, pTmpOffice^.TicketCount]);
+    // update ticket count
+    TmpTicketCount := 0;
+    i := 0;
+    while TicketList.GetByIndex(i) <> nil do
+    begin
+      pTmpTicket := TicketList.GetByIndex(i);
+      if (not pTmpTicket^.Deleted) and (pTmpTicket^.OfficeId = pTmpOffice^.Id) then
+      begin
+        Inc(TmpTicketCount);
+      end;
+      Inc(i);
+    end;
+    pTmpOffice^.TicketCount := TmpTicketCount;
+
+    pTmpTicket := TicketList.GetTopTicket(pTmpOffice^.Id);
+    if Assigned(pTmpTicket) then
+      pTmpOffice^.TicketNum := pTmpTicket^.Num
+    else
+      pTmpOffice^.TicketNum := 0;
+
+    // STATE <tickets_count> [ticket_num]
+    s := Format('STATE %d', [pTmpOffice^.TicketCount]);
     if pTmpOffice^.TicketCount > 0 then
       s := s + ' ' + IntToStr(pTmpOffice^.TicketNum);
 
@@ -271,28 +302,44 @@ begin
         if AHostPort <> '' then
           pTmpOffice^.HostPort := AHostPort;
 
-        // OFFICE <office_num>: CREATE_TICKET
+        sCmd := ExtractFirstWord(ss);
+
+        // CREATE_TICKET
         if sCmd = 'CREATE_TICKET' then
         begin
           CreateTicket(pTmpOffice^.Id);
           UpdateVisualTickets();
         end
         else
-        // OFFICE <office_num>: NEXT_TICKET
+        // NEXT_TICKET
         if sCmd = 'NEXT_TICKET' then
         begin
           NextTicket(pTmpOffice^.Id);
           UpdateVisualTickets();
         end
         else
-        // OFFICE <office_num>: INFO_REQ
+        // INFO_REQ
         if sCmd = 'INFO_REQ' then
         begin
-          // OFFICE 1: INFO <num> <Caption> <TicketPrefix> <IconName> <Comment>
-          s := Format('INFO %d %s %s %s', [pTmpOffice^.Caption,
+          pTmpOffice^.State := osIdle;
+
+          // INFO <Caption> <TicketPrefix> <IconName> <Comment>
+          s := Format('INFO %s %s %s %s', [pTmpOffice^.Caption, pTmpOffice^.TicketPrefix,
             pTmpOffice^.IconName, pTmpOffice^.Comment]);
 
           PostCmd(pTmpOffice^, s);
+        end
+        else
+        // STATE_REQ
+        if sCmd = 'STATE_REQ' then
+        begin
+          UpdateOfficesStates();
+          {
+          // STATE <Caption> <TicketPrefix> <IconName> <Comment>
+          s := Format('INFO %s %s %s %s', [pTmpOffice^.Caption, pTmpOffice^.TicketPrefix,
+            pTmpOffice^.IconName, pTmpOffice^.Comment]);
+
+          PostCmd(pTmpOffice^, s);  }
         end;
       end;
     end;

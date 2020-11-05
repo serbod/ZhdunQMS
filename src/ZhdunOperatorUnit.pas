@@ -18,7 +18,7 @@ type
     Office: TOffice;
     MonitorHost: string;
     MonitorPort: Integer;
-
+    NeedUpdateInfo: Boolean;
 
     procedure AfterConstruction; override;
     procedure BeforeDestruction; override;
@@ -44,6 +44,7 @@ procedure TOperatorManager.AfterConstruction;
 begin
   inherited AfterConstruction;
   Office.Init();
+  NeedUpdateInfo := True;
 end;
 
 procedure TOperatorManager.BeforeDestruction;
@@ -65,6 +66,7 @@ begin
     MonitorPort := ini.ReadInteger(sSection, 'MonitorPort', MonitorPort);
 
     sSection := 'Office';
+    Office.Num := ini.ReadInteger(sSection, 'Num', Office.Num);
     Office.Caption := ini.ReadString(sSection, 'Caption', Office.Caption);
     Office.Comment := ini.ReadString(sSection, 'Comment', Office.Comment);
     Office.IconName := ini.ReadString(sSection, 'IconName', Office.IconName);
@@ -91,6 +93,7 @@ begin
     ini.WriteInteger(sSection, 'MonitorPort', MonitorPort);
 
     sSection := 'Office';
+    ini.WriteInteger(sSection, 'Num', Office.Num);
     ini.WriteString(sSection, 'Caption', Office.Caption);
     ini.WriteString(sSection, 'Comment', Office.Comment);
     ini.WriteString(sSection, 'IconName', Office.IconName);
@@ -151,7 +154,7 @@ begin
       end
       else
       // OFFICE 1: INFO <Caption> <TicketPrefix> <IconName> <Comment>
-      if sCmd = 'OFFICE_INFO' then
+      if sCmd = 'INFO' then
       begin
         s := ExtractFirstWord(ss); // Caption
         Office.Caption := s;
@@ -163,6 +166,8 @@ begin
         Office.IconName := s;
 
         Office.Comment := Trim(ss); // Comment
+
+        NeedUpdateInfo := False;
       end;
     end;
 

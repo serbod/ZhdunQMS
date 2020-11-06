@@ -20,11 +20,17 @@ type
     TicketList: TTicketList;
 
     VisualTickets: TVisualTicketArray;
+    VisualButtons: TVisualButtonArray;
 
     VisTicketsArea: TRect;
     TicketSize: TPoint;
     TicketBorderSize: Integer;
     MaxVisTickets: Integer;
+
+    VisButtonsArea: TRect;
+    VisButtonSize: TPoint;
+    VisButtonBorderSize: Integer;
+    MaxVisButtons: Integer;
 
     UDPPort: Integer;
 
@@ -38,6 +44,7 @@ type
     function NextTicket(AOfficeId: Integer): PTicket;
 
     procedure UpdateVisualTickets();
+    procedure UpdateVisualButtons();
 
     procedure UpdateOfficesStates();
 
@@ -227,6 +234,46 @@ begin
     TmpVisualTickets := Concat(TmpVisualTickets, [TmpVisualTicket]);
   end;
   VisualTickets := TmpVisualTickets;
+end;
+
+procedure TTicketManager.UpdateVisualButtons();
+var
+  TmpVisualButtons: TVisualButtonArray;
+  TmpVisualButton: TVisualButton;
+  //i, ii: Integer;
+  OfficeIterator: TOfficeListIterator;
+  pTmpOffice: POffice;
+  //pTmpTicket: PTicket;
+  NextPos: TPoint;
+begin
+  TmpVisualButtons := [];
+  NextPos := VisButtonsArea.TopLeft;
+
+  VisButtonSize.X := VisButtonsArea.Width;
+  VisButtonSize.Y := (VisButtonsArea.Height div MaxVisButtons);
+
+  OfficeIterator.Init(OfficeList);
+  while OfficeIterator.Next(pTmpOffice) do
+  begin
+    if not pTmpOffice^.IsVisible() then
+      Continue;
+
+    //TmpVisualTicket.IsValid := True;
+    //TmpVisualTicket.Marked := ;
+    TmpVisualButton.OfficeNum := pTmpOffice^.Num;
+    TmpVisualButton.Text := pTmpOffice^.Caption;
+    TmpVisualButton.SubText := pTmpOffice^.Comment;
+
+    TmpVisualButton.Rect.TopLeft := NextPos;
+    TmpVisualButton.Rect.Width := VisButtonSize.X;
+    TmpVisualButton.Rect.Height := VisButtonSize.Y;
+
+    NextPos.Y := NextPos.Y + VisButtonSize.Y;
+
+    TmpVisualButtons := Concat(TmpVisualButtons, [TmpVisualButton]);
+  end;
+  VisualButtons := TmpVisualButtons;
+
 end;
 
 procedure TTicketManager.UpdateOfficesStates();

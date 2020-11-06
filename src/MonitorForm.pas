@@ -34,6 +34,7 @@ type
     procedure DrawBackground(AC: TCanvas);
     procedure DrawHeader(AC: TCanvas);
     procedure DrawTicket(AC: TCanvas; const ATicket: TVisualTicket);
+    procedure DrawButton(AC: TCanvas; const AButton: TVisualButton);
 
     procedure OnSendCmdHandler(const ACmdText, AHostPort: string);
   public
@@ -78,6 +79,11 @@ begin
   begin
     DrawTicket(c, FTicketManager.VisualTickets[i]);
   end;
+
+  for i := Low(FTicketManager.VisualButtons) to High(FTicketManager.VisualButtons) do
+  begin
+    DrawButton(c, FTicketManager.VisualButtons[i]);
+  end;
 end;
 
 procedure TFormMonitor.Timer1000msTimer(Sender: TObject);
@@ -102,11 +108,21 @@ end;
 
 procedure TFormMonitor.AfterResize();
 begin
+  // x = 10 .. (2/3) - 20
   FTicketManager.VisTicketsArea.Left := 10;
-  FTicketManager.VisTicketsArea.Width := ((Width div 3) * 2) - 20;
-
+  FTicketManager.VisTicketsArea.Right := ((Width div 3) * 2) - 20;
+  // y = 50 .. Max-100
   FTicketManager.VisTicketsArea.Top := 50;
-  FTicketManager.VisTicketsArea.Height := (Height - FTicketManager.VisTicketsArea.Top) - 50;
+  FTicketManager.VisTicketsArea.Bottom := Height - 50;
+
+
+  // x = (2/3)+10 .. Max-10
+  FTicketManager.VisButtonsArea.Left := ((Width div 3) * 2) + 10;
+  FTicketManager.VisButtonsArea.Right := Width - 10;
+  // y = 50 .. Max-100
+  FTicketManager.VisButtonsArea.Top := 50;
+  FTicketManager.VisButtonsArea.Bottom := Height - 50;
+
 end;
 
 procedure TFormMonitor.DrawBackground(AC: TCanvas);
@@ -212,6 +228,42 @@ begin
   AC.TextOut(r.Left + ((r.Width div 3) * 2), r.Top + 10, ATicket.TicketText);
 end;
 
+procedure TFormMonitor.DrawButton(AC: TCanvas; const AButton: TVisualButton);
+var
+  r: TRect;
+  s: string;
+begin
+  // frame
+  AC.DrawingMode := dmAlphaBlend;
+
+  //AC.Brush.Style := bsSolid;
+  AC.Brush.Style := bsClear;
+  AC.Brush.Color := clWhite;
+
+  r := AButton.Rect;
+  AC.FillRect(r);
+
+  // == Office text
+  AC.Brush.Style := bsClear;
+  AC.Font.Name := 'Tahoma';
+  AC.Font.Size := r.Height div 4;
+  //AC.Font.Quality := fqCleartypeNatural;
+  AC.Font.Quality := fqAntialiased;
+
+  //AC.Font.Color := clLtGray;
+  //AC.TextOut(5, 5, FHeaderText);
+
+  AC.Font.Color := clBlack;
+  AC.TextOut(r.Left + 10, r.Top + 10, AButton.Text);
+
+  if AButton.SubText <> '' then
+  begin
+    AC.Font.Color := clBlack;
+    AC.Font.Size := r.Height div 16;
+    AC.TextOut(r.Left + 10, r.Top + ((r.Height div 3) * 2), AButton.SubText);
+  end;
+end;
+
 procedure TFormMonitor.OnSendCmdHandler(const ACmdText, AHostPort: string);
 begin
   if (ACmdText <> '') and (AHostPort <> '') then
@@ -225,8 +277,13 @@ begin
   inherited AfterConstruction;
 
   FTicketManager := TTicketManager.Create;
+
   FTicketManager.MaxVisTickets := 6;
   FTicketManager.TicketBorderSize := 5;
+
+  FTicketManager.VisButtonBorderSize := 5;
+  FTicketManager.MaxVisButtons := 3;
+
   FTicketManager.UDPPort := 4444;
   FTicketManager.OnSendCmd := @OnSendCmdHandler;
 
@@ -262,6 +319,7 @@ end;
 procedure TFormMonitor.UpdateView();
 begin
   FTicketManager.UpdateVisualTickets();
+  FTicketManager.UpdateVisualButtons();
   Invalidate();
 end;
 

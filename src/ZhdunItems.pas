@@ -93,6 +93,7 @@ type
     HostPort: string;
 
     procedure Init();
+    function IsVisible(): Boolean;
   end;
   TOfficeArray = array of TOffice;
 
@@ -142,6 +143,18 @@ type
   TVisualTicketArray = array of TVisualTicket;
 
 
+  TVisualButton = object
+    Rect: TRect;
+
+    Marked: Boolean;
+    Text: string;
+    SubText: string;
+    IsValid: Boolean;
+
+    OfficeNum: Integer;
+  end;
+
+  TVisualButtonArray = array of TVisualButton;
 
 
 implementation
@@ -303,6 +316,11 @@ begin
 
   TicketPrefix := '';
   GroupId := -1;
+end;
+
+function TOffice.IsVisible(): Boolean;
+begin
+  Result := State in [osBusy, osIdle, osPaused];
 end;
 
 { TOfficeList }

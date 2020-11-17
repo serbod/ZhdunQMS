@@ -7,6 +7,9 @@ interface
 uses
   Classes, SysUtils, ZhdunItems, RFUtils, IniFiles;
 
+const
+  ciTicketShowTimeout = 10; // seconds
+
 type
   TSendCmdEvent = procedure(const ACmdText, AHostPort: string) of object;
 
@@ -14,12 +17,12 @@ type
 
   TTicketManager = class
   private
+    FTicketList: TTicketList;
+    FOfficeList: TOfficeList;
     FOnSendCmd: TSendCmdEvent;
   public
-    OfficeList: TOfficeList;
-    TicketList: TTicketList;
 
-    VisualTickets: TVisualTicketArray;
+    VisualOffices: TVisualOfficeArray;
     VisualButtons: TVisualButtonArray;
 
     VisTicketsArea: TRect;
@@ -32,6 +35,8 @@ type
     VisButtonBorderSize: Integer;
     MaxVisButtons: Integer;
 
+    VisTicket: TVisualTicket;
+
     UDPPort: Integer;
 
     procedure AfterConstruction; override;
@@ -40,10 +45,12 @@ type
     procedure LoadConfig();
     procedure SaveConfig();
 
-    function CreateTicket(AOfficeId: Integer): PTicket;
-    function NextTicket(AOfficeId: Integer): PTicket;
+    { Create new ticket for specified office }
+    function CreateTicket(AOfficeNum: Integer): TTicket;
+    { Discard current ticket and set next ticket as current for specified office }
+    function NextTicket(AOfficeNum: Integer): TTicket;
 
-    procedure UpdateVisualTickets();
+    procedure UpdateVisualOffices();
     procedure UpdateVisualButtons();
 
     procedure UpdateOfficesStates();
@@ -51,6 +58,9 @@ type
     procedure PostCmd(AOffice: TOffice; ACmdText: string);
 
     procedure ProcessCmd(ACmdText, AHostPort: string);
+
+    property TicketList: TTicketList read FTicketList;
+    property OfficeList: TOfficeList read FOfficeList;
 
     property OnSendCmd: TSendCmdEvent read FOnSendCmd write FOnSendCmd;
   end;
@@ -63,12 +73,16 @@ implementation
 procedure TTicketManager.AfterConstruction;
 begin
   inherited AfterConstruction;
-  OfficeList.Init();
-  TicketList.Init();
+  FTicketList := TTicketList.Create();
+  FOfficeList := TOfficeList.Create();
+
+  VisTicket.Visible := False;
 end;
 
 procedure TTicketManager.BeforeDestruction;
 begin
+  FreeAndNil(FOfficeList);
+  FreeAndNil(FTicketList);
   inherited BeforeDestruction;
 end;
 
@@ -94,7 +108,7 @@ begin
       if not ini.SectionExists(sSection) then
         Continue;
 
-      OfficeItem.Init();
+      OfficeItem := TOffice.Create();
       OfficeItem.Num := ini.ReadInteger(sSection, 'Num', OfficeItem.Num);
       OfficeItem.Caption := ini.ReadString(sSection, 'Caption', OfficeItem.Caption);
       OfficeItem.Comment := ini.ReadString(sSection, 'Comment', OfficeItem.Comment);
@@ -114,8 +128,9 @@ procedure TTicketManager.SaveConfig();
 var
   ini: TMemIniFile;
   sSection: string;
-  i, n: Integer;
-  pOfficeItem: POffice;
+  n: Integer;
+  OfficeIterator: TOfficeListIterator;
+  OfficeItem: TOffice;
 begin
   ini := TMemIniFile.Create('zhdun.ini');
   try
@@ -124,145 +139,184 @@ begin
     ini.WriteInteger(sSection, 'TicketBorderSize', TicketBorderSize);
     ini.WriteInteger(sSection, 'UDPPort', UDPPort);
 
-    ini.WriteInteger(sSection, 'OfficeCount', OfficeList.GetCount());
-    i := 0;
     n := 0;
-    while OfficeList.GetByIndex(i) <> nil do
+    OfficeIterator.Init(OfficeList);
+    while OfficeIterator.Next(OfficeItem) do
     begin
-      pOfficeItem := OfficeList.GetByIndex(i);
-      if not pOfficeItem^.Deleted then
-      begin
-        Inc(n);
-        sSection := 'Office_' + IntToStr(n+1);
-        ini.WriteInteger(sSection, 'Num', pOfficeItem^.Num);
-        ini.WriteString(sSection, 'Caption', pOfficeItem^.Caption);
-        ini.WriteString(sSection, 'Comment', pOfficeItem^.Comment);
-        ini.WriteString(sSection, 'IconName', pOfficeItem^.IconName);
-        //State: TOfficeState;
-        //Deleted: Boolean;
+      Inc(n);
+      sSection := 'Office_' + IntToStr(n+1);
+      ini.WriteInteger(sSection, 'Num', OfficeItem.Num);
+      ini.WriteString(sSection, 'Caption', OfficeItem.Caption);
+      ini.WriteString(sSection, 'Comment', OfficeItem.Comment);
+      ini.WriteString(sSection, 'IconName', OfficeItem.IconName);
+      //State: TOfficeState;
+      //Deleted: Boolean;
 
-        ini.WriteString(sSection, 'TicketPrefix', pOfficeItem^.TicketPrefix);
-        ini.WriteInteger(sSection, 'GroupId', pOfficeItem^.GroupId);
-      end;
-      Inc(i);
+      ini.WriteString(sSection, 'TicketPrefix', OfficeItem.TicketPrefix);
+      ini.WriteInteger(sSection, 'GroupId', OfficeItem.GroupId);
     end;
+
+    ini.WriteInteger('Main', 'OfficeCount', n);
   finally
     FreeAndNil(ini);
   end;
 end;
 
-function TTicketManager.CreateTicket(AOfficeId: Integer): PTicket;
+function TTicketManager.CreateTicket(AOfficeNum: Integer): TTicket;
 var
-  i, n: Integer;
-  //pTicketItem: PTicket;
   MaxNum: Integer;
-  pTmpOffice: POffice;
-  TmpTicket: TTicket;
+  TmpOffice: TOffice;
+  i: Integer;
 begin
   Result := nil;
-  pTmpOffice := OfficeList.Get(AOfficeId);
-  if pTmpOffice = nil then
+  TmpOffice := OfficeList.GetByNum(AOfficeNum);
+  if not Assigned(TmpOffice) then
     Exit;
 
-  MaxNum := TicketList.GetMaxNum(AOfficeId);
+  MaxNum := TicketList.GetMaxNum(AOfficeNum);
 
   Inc(MaxNum);
-  TmpTicket.Init();
-  TmpTicket.OfficeId := AOfficeId;
-  TmpTicket.Num := MaxNum;
-  TmpTicket.Caption := pTmpOffice^.TicketPrefix + IntToStr(TmpTicket.Num);
+  // replace deleted or create new
+  for i := 0 to TicketList.Count-1 do
+  begin
+    if TicketList.Items[i].Deleted then
+      Result := TicketList.Items[i];
+  end;
 
-  n := TicketList.Add(TmpTicket);
-  Result := TicketList.Get(n);
+  if not Assigned(Result) then
+  begin
+    Result := TTicket.Create;
+    TicketList.Add(Result);
+  end;
+
+  Result.TimeCreate := Now();
+  Result.TimeStart := 0;
+  Result.TimeFinish := 0;
+
+  Result.Deleted := False;
+  Result.OfficeNum := AOfficeNum;
+  Result.Num := MaxNum;
+  Result.IconId := 0;
+  Result.Caption := TmpOffice.TicketPrefix + IntToStr(Result.Num);
+
 end;
 
-function TTicketManager.NextTicket(AOfficeId: Integer): PTicket;
+function TTicketManager.NextTicket(AOfficeNum: Integer): TTicket;
 var
-  pTmpTicket: PTicket;
+  Ticket: TTicket;
 begin
   Result := nil;
-  Assert(AOfficeID >= 0);
+  Assert(AOfficeNum >= 0);
 
-  pTmpTicket := TicketList.GetTopTicket(AOfficeId);
-  if not Assigned(pTmpTicket) then
+  Ticket := TicketList.GetTopTicket(AOfficeNum);
+  if not Assigned(Ticket) then
     Exit;
 
-  TicketList.Delete(pTmpTicket^.Id);
+  Ticket.Deleted := True;
+  //TicketList.Delete(Ticket.Id);
 
-  Result := TicketList.GetTopTicket(AOfficeId);
+  Result := TicketList.GetTopTicket(AOfficeNum);
 end;
 
-procedure TTicketManager.UpdateVisualTickets();
+procedure TTicketManager.UpdateVisualOffices();
 var
-  TmpVisualTickets: TVisualTicketArray;
-  TmpVisualTicket: TVisualTicket;
-  i, ii: Integer;
+  TmpVisualOffices: TVisualOfficeArray;
+  TmpVisualOffice: TVisualOffice;
   OfficeIterator: TOfficeListIterator;
-  pTmpOffice: POffice;
-  pTmpTicket: PTicket;
+  TmpOffice: TOffice;
+  TmpTicket: TTicket;
   NextPos: TPoint;
 begin
-  TmpVisualTickets := [];
+  TmpVisualOffices := [];
   NextPos := VisTicketsArea.TopLeft;
 
   TicketSize.X := VisTicketsArea.Width;
   TicketSize.Y := (VisTicketsArea.Height div MaxVisTickets);
 
   OfficeIterator.Init(OfficeList);
-  while OfficeIterator.Next(pTmpOffice) do
+  while OfficeIterator.Next(TmpOffice) do
   begin
-    pTmpTicket := TicketList.GetTopTicket(pTmpOffice^.Id);
-    if not Assigned(pTmpTicket) then
+    if not TmpOffice.IsVisible() then
       Continue;
 
-    //TmpVisualTicket.IsValid := True;
-    //TmpVisualTicket.Marked := ;
-    TmpVisualTicket.OfficeId := pTmpOffice^.Id;
-    TmpVisualTicket.TicketId := pTmpTicket^.Id;
-    TmpVisualTicket.OfficeText := pTmpOffice^.Caption;
-    TmpVisualTicket.TicketText := pTmpTicket^.Caption;
+    TmpTicket := TicketList.GetTopTicket(TmpOffice.Num);
+    if Assigned(TmpTicket) then
+    begin
+      TmpVisualOffice.TicketNum := TmpTicket.Num;
+      TmpVisualOffice.TicketText := TmpTicket.Caption;
+      if TmpOffice.TicketCount > 1 then
+        TmpVisualOffice.TicketText := TmpVisualOffice.TicketText + Format(
+          '  (+%d)', [TmpOffice.TicketCount]);
+    end
+    else
+    begin
+      TmpVisualOffice.TicketNum := 0;
+      TmpVisualOffice.TicketText := '';
+    end;
 
-    if pTmpOffice^.TicketCount > 1 then
-      TmpVisualTicket.TicketText := TmpVisualTicket.TicketText + Format(
-        '  (+%d)', [pTmpOffice^.TicketCount]);
+    //TmpVisualOffice.IsValid := True;
+    //TmpVisualOffice.Marked := ;
+    TmpVisualOffice.OfficeNum := TmpOffice.Num;
+    TmpVisualOffice.TicketNum := TmpTicket.Num;
+    TmpVisualOffice.OfficeText := TmpOffice.Caption;
+    case TmpOffice.State of
+      osPaused: TmpVisualOffice.OfficeText := TmpVisualOffice.OfficeText + '  (Paused)';
+      osLost: TmpVisualOffice.OfficeText := TmpVisualOffice.OfficeText + '  (Lost)';
+    end;
 
-    TmpVisualTicket.Pos := NextPos;
-    TmpVisualTicket.Size := TicketSize;
+
+    TmpVisualOffice.Pos := NextPos;
+    TmpVisualOffice.Size := TicketSize;
 
     NextPos.Y := NextPos.Y + TicketSize.Y;
 
-    TmpVisualTickets := Concat(TmpVisualTickets, [TmpVisualTicket]);
+    // correct size to show borders
+    TmpVisualOffice.Pos.X := TmpVisualOffice.Pos.X + (TicketBorderSize div 2);
+    TmpVisualOffice.Pos.Y := TmpVisualOffice.Pos.Y + (TicketBorderSize div 2);
+    TmpVisualOffice.Size.X := TmpVisualOffice.Size.X - TicketBorderSize;
+    TmpVisualOffice.Size.Y := TmpVisualOffice.Size.Y - TicketBorderSize;
+
+    TmpVisualOffices := Concat(TmpVisualOffices, [TmpVisualOffice]);
   end;
-  VisualTickets := TmpVisualTickets;
+  VisualOffices := TmpVisualOffices;
 end;
 
 procedure TTicketManager.UpdateVisualButtons();
 var
   TmpVisualButtons: TVisualButtonArray;
   TmpVisualButton: TVisualButton;
-  //i, ii: Integer;
   OfficeIterator: TOfficeListIterator;
-  pTmpOffice: POffice;
-  //pTmpTicket: PTicket;
+  TmpOffice: TOffice;
   NextPos: TPoint;
 begin
   TmpVisualButtons := [];
   NextPos := VisButtonsArea.TopLeft;
 
+  if VisTicket.Visible then
+  begin
+    VisTicket.Rect := VisButtonsArea;
+    if SecondsBetween(Now(), VisTicket.TimeCreate) > ciTicketShowTimeout then
+      VisTicket.Visible := False
+    else
+      Exit;
+  end;
+
   VisButtonSize.X := VisButtonsArea.Width;
   VisButtonSize.Y := (VisButtonsArea.Height div MaxVisButtons);
 
   OfficeIterator.Init(OfficeList);
-  while OfficeIterator.Next(pTmpOffice) do
+  while OfficeIterator.Next(TmpOffice) do
   begin
-    if not pTmpOffice^.IsVisible() then
+    if not TmpOffice.IsVisible() then
       Continue;
 
     //TmpVisualTicket.IsValid := True;
     //TmpVisualTicket.Marked := ;
-    TmpVisualButton.OfficeNum := pTmpOffice^.Num;
-    TmpVisualButton.Text := pTmpOffice^.Caption;
-    TmpVisualButton.SubText := pTmpOffice^.Comment;
+    TmpVisualButton.OfficeNum := TmpOffice.Num;
+    TmpVisualButton.Text := TmpOffice.Caption;
+    TmpVisualButton.SubText := TmpOffice.Comment;
+
+    TmpVisualButton.IsPressed := False;
 
     TmpVisualButton.Rect.TopLeft := NextPos;
     TmpVisualButton.Rect.Width := VisButtonSize.X;
@@ -279,43 +333,41 @@ end;
 procedure TTicketManager.UpdateOfficesStates();
 var
   OfficeIterator: TOfficeListIterator;
-  pTmpOffice: POffice;
-  pTmpTicket: PTicket;
+  TmpOffice: TOffice;
+  TmpTicket: TTicket;
   s: string;
   i, TmpTicketCount: Integer;
 begin
   OfficeIterator.Init(OfficeList);
-  while OfficeIterator.Next(pTmpOffice) do
+  while OfficeIterator.Next(TmpOffice) do
   begin
-    if pTmpOffice^.State in [osUndef, osOff] then
+    if TmpOffice.State in [osUndef, osOff] then
       Continue;
 
     // update ticket count
     TmpTicketCount := 0;
-    i := 0;
-    while TicketList.GetByIndex(i) <> nil do
+    for i := 0 to TicketList.Count-1 do
     begin
-      pTmpTicket := TicketList.GetByIndex(i);
-      if (not pTmpTicket^.Deleted) and (pTmpTicket^.OfficeId = pTmpOffice^.Id) then
+      TmpTicket := TicketList.Items[i];
+      if (not TmpTicket.Deleted) and (TmpTicket.OfficeNum = TmpOffice.Num) then
       begin
         Inc(TmpTicketCount);
       end;
-      Inc(i);
     end;
-    pTmpOffice^.TicketCount := TmpTicketCount;
+    TmpOffice.TicketCount := TmpTicketCount;
 
-    pTmpTicket := TicketList.GetTopTicket(pTmpOffice^.Id);
-    if Assigned(pTmpTicket) then
-      pTmpOffice^.TicketNum := pTmpTicket^.Num
+    TmpTicket := TicketList.GetTopTicket(TmpOffice.Num);
+    if Assigned(TmpTicket) then
+      TmpOffice.TicketNum := TmpTicket.Num
     else
-      pTmpOffice^.TicketNum := 0;
+      TmpOffice.TicketNum := 0;
 
     // STATE <tickets_count> [ticket_num]
-    s := Format('STATE %d', [pTmpOffice^.TicketCount]);
-    if pTmpOffice^.TicketCount > 0 then
-      s := s + ' ' + IntToStr(pTmpOffice^.TicketNum);
+    s := Format('STATE %d', [TmpOffice.TicketCount]);
+    if TmpOffice.TicketCount > 0 then
+      s := s + ' ' + IntToStr(TmpOffice.TicketNum);
 
-    PostCmd(pTmpOffice^, s);
+    PostCmd(TmpOffice, s);
   end;
 end;
 
@@ -331,7 +383,7 @@ procedure TTicketManager.ProcessCmd(ACmdText, AHostPort: string);
 var
   s, ss, sCmd: string;
   iNum: Integer;
-  pTmpOffice: POffice;
+  TmpOffice: TOffice;
 begin
   ss := ACmdText;
   sCmd := ExtractFirstWord(ss);
@@ -343,38 +395,38 @@ begin
     iNum := StrToIntDef(s, -1);
     if iNum <> -1 then
     begin
-      pTmpOffice := OfficeList.GetByNum(iNum);
-      if Assigned(pTmpOffice) then
+      TmpOffice := OfficeList.GetByNum(iNum);
+      if Assigned(TmpOffice) then
       begin
         if AHostPort <> '' then
-          pTmpOffice^.HostPort := AHostPort;
+          TmpOffice.HostPort := AHostPort;
 
         sCmd := ExtractFirstWord(ss);
 
         // CREATE_TICKET
         if sCmd = 'CREATE_TICKET' then
         begin
-          CreateTicket(pTmpOffice^.Id);
-          UpdateVisualTickets();
+          CreateTicket(TmpOffice.Num);
+          UpdateVisualOffices();
         end
         else
         // NEXT_TICKET
         if sCmd = 'NEXT_TICKET' then
         begin
-          NextTicket(pTmpOffice^.Id);
-          UpdateVisualTickets();
+          NextTicket(TmpOffice.Num);
+          UpdateVisualOffices();
         end
         else
         // INFO_REQ
         if sCmd = 'INFO_REQ' then
         begin
-          pTmpOffice^.State := osIdle;
+          TmpOffice.State := osIdle;
 
           // INFO <Caption> <TicketPrefix> <IconName> <Comment>
-          s := Format('INFO %s %s %s %s', [pTmpOffice^.Caption, pTmpOffice^.TicketPrefix,
-            pTmpOffice^.IconName, pTmpOffice^.Comment]);
+          s := Format('INFO %s %s %s %s', [TmpOffice.Caption, TmpOffice.TicketPrefix,
+            TmpOffice.IconName, TmpOffice.Comment]);
 
-          PostCmd(pTmpOffice^, s);
+          PostCmd(TmpOffice, s);
         end
         else
         // STATE_REQ
@@ -383,10 +435,10 @@ begin
           UpdateOfficesStates();
           {
           // STATE <Caption> <TicketPrefix> <IconName> <Comment>
-          s := Format('INFO %s %s %s %s', [pTmpOffice^.Caption, pTmpOffice^.TicketPrefix,
-            pTmpOffice^.IconName, pTmpOffice^.Comment]);
+          s := Format('INFO %s %s %s %s', [TmpOffice.Caption, TmpOffice.TicketPrefix,
+            TmpOffice.IconName, TmpOffice.Comment]);
 
-          PostCmd(pTmpOffice^, s);  }
+          PostCmd(TmpOffice, s);  }
         end;
       end;
     end;

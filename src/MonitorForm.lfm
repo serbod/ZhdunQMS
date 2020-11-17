@@ -14,6 +14,7 @@ object FormMonitor: TFormMonitor
     Top = 0
     Width = 526
     Align = alClient
+    OnMouseUp = PaintBoxMouseUp
     OnPaint = PaintBoxPaint
   end
   object Timer1000ms: TTimer

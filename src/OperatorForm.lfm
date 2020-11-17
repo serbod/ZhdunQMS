@@ -1,18 +1,20 @@
 object FormOperator: TFormOperator
   Left = 597
-  Height = 139
+  Height = 152
   Top = 254
   Width = 386
   Caption = 'Zhdun'
-  ClientHeight = 139
+  ClientHeight = 152
   ClientWidth = 386
   LCLVersion = '2.0.10.0'
   object Button1: TButton
-    Left = 15
-    Height = 25
-    Top = 72
-    Width = 124
+    Left = 216
+    Height = 33
+    Top = 29
+    Width = 153
     Action = actNextTicket
+    Font.Height = -19
+    ParentFont = False
     TabOrder = 0
   end
   object lbCurTicketLabel: TLabel
@@ -54,6 +56,20 @@ object FormOperator: TFormOperator
     Font.Style = [fsBold]
     ParentColor = False
     ParentFont = False
+  end
+  object panNoLink: TPanel
+    Left = 216
+    Height = 66
+    Top = 0
+    Width = 170
+    BevelOuter = bvNone
+    Caption = 'CHECK CONNECTION'
+    Font.Color = clRed
+    Font.Height = -21
+    Font.Style = [fsBold]
+    ParentFont = False
+    TabOrder = 1
+    Wordwrap = True
   end
   object TrayIcon: TTrayIcon
     PopUpMenu = pmTray

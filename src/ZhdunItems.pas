@@ -22,12 +22,11 @@ type
     property Office: IZOffice;
   end;
 
-  PTicket = ^TTicket;
-
   { TTicket }
 
-  TTicket = object
-    Id: Integer;
+  TTicket = class(TObject)
+  public
+    //Id: Integer;
     Num: Integer;
     Caption: string;
     IconId: Integer;
@@ -36,45 +35,39 @@ type
     TimeStart: TDateTime;
     TimeFinish: TDateTime;
 
-    OfficeId: Integer;
+    OfficeNum: Integer;
     Deleted: Boolean;
 
-    procedure Init();
+    constructor Create();
   end;
-  TTicketArray = array of TTicket;
 
   { TTicketList }
 
-  TTicketList = object
-  private
-    Items: TTicketArray;
-    Count: Integer;
+  TTicketList = class(TList)
+  protected
+    procedure Notify(Ptr: Pointer; Action: TListNotification); override;
+
+    function GetItem(AIndex: Integer): TTicket;
+    procedure SetItem(AIndex: Integer; AValue: TTicket);
   public
+    function GetItemByNum(ANum: Integer): TTicket;
 
-    procedure Init();
+    { Return maximum ticket Num for given AOfficeNum or 0 if no ticket found }
+    function GetMaxNum(AOfficeNum: Integer): Integer;
+    { Return ticket with minimum Num for given AOfficeNum, or nil if not found }
+    function GetTopTicket(AOfficeNum: Integer): TTicket;
 
-    function Add(const AValue: TTicket): Integer;
-    function Delete(AId: Integer): Boolean;
-    function Get(AId: Integer): PTicket;
-    function GetByIndex(AIndex: Integer): PTicket;
-
-    function GetCount(): Integer;
-
-    { Return maximum ticket Num for given AOfficeId or 0 if no ticket found }
-    function GetMaxNum(AOfficeId: Integer): Integer;
-    { Return ticket with minimum Num for given AOfficeId, or nil if not found }
-    function GetTopTicket(AOfficeId: Integer): PTicket;
+    property Items[AIndex: Integer]: TTicket read GetItem write SetItem;
   end;
 
 
   TOfficeState = (osUndef, osOff, osIdle, osBusy, osPaused, osLost);
 
-  POffice = ^TOffice;
-
   { TOffice }
 
-  TOffice = object
-    Id: Integer;
+  TOffice = class(TObject)
+  public
+    //Id: Integer;
     Num: Integer;
     Caption: string;
     Comment: string;
@@ -92,27 +85,24 @@ type
     // server part
     HostPort: string;
 
-    procedure Init();
+    // local
+    ButtonPressTimestamp: Int64;
+
+    constructor Create();
     function IsVisible(): Boolean;
   end;
-  TOfficeArray = array of TOffice;
 
   { TOfficeList }
 
-  POfficeList = ^TOfficeList;
-  TOfficeList = object
-  private
-    Items: TOfficeArray;
-    Count: Integer;
-  public
-    procedure Init();
+  TOfficeList = class(TList)
+    procedure Notify(Ptr: Pointer; Action: TListNotification); override;
 
-    function Add(const AValue: TOffice): Integer;
-    function Delete(AId: Integer): Boolean;
-    function Get(AId: Integer): POffice;
-    function GetByIndex(AIndex: Integer): POffice;
-    function GetByNum(ANum: Integer): POffice;
-    function GetCount(): Integer;
+    function GetItem(AIndex: Integer): TOffice;
+    procedure SetItem(AIndex: Integer; AValue: TOffice);
+  public
+    function GetByNum(ANum: Integer): TOffice;
+
+    property Items[AIndex: Integer]: TOffice read GetItem write SetItem;
   end;
 
 
@@ -120,15 +110,15 @@ type
 
   TOfficeListIterator = object
   private
-    pList: POfficeList;
+    List: TOfficeList;
     n: Integer;
   public
     procedure Init(const AList: TOfficeList);
-    function GetNext(): POffice;
-    function Next(out AValue: POffice): Boolean;
+    function GetNext(): TOffice;
+    function Next(out AValue: TOffice): Boolean;
   end;
 
-  TVisualTicket = object
+  TVisualOffice = object
     Pos: TPoint;
     Size: TPoint;
     Marked: Boolean;
@@ -136,17 +126,19 @@ type
     TicketText: string;
     IsValid: Boolean;
 
-    TicketId: Integer;
-    OfficeId: Integer;
+    TicketNum: Integer;
+    OfficeNum: Integer;
   end;
 
-  TVisualTicketArray = array of TVisualTicket;
+  TVisualOfficeArray = array of TVisualOffice;
 
 
+  PVisualButton = ^TVisualButton;
   TVisualButton = object
     Rect: TRect;
 
     Marked: Boolean;
+    IsPressed: Boolean;
     Text: string;
     SubText: string;
     IsValid: Boolean;
@@ -156,6 +148,17 @@ type
 
   TVisualButtonArray = array of TVisualButton;
 
+  TVisualTicket = object
+    Rect: TRect;
+    Visible: Boolean;
+    OfficeText: string;
+    TicketText: string;
+    TimeCreate: TDateTime;
+
+    TicketNum: Integer;
+    OfficeNum: Integer;
+  end;
+
 
 implementation
 
@@ -163,22 +166,26 @@ implementation
 
 procedure TOfficeListIterator.Init(const AList: TOfficeList);
 begin
-  pList := Addr(AList);
+  List := AList;
   n := -1;
 end;
 
-function TOfficeListIterator.GetNext(): POffice;
+function TOfficeListIterator.GetNext(): TOffice;
 begin
-  Inc(n);
-  Result := pList^.GetByIndex(n);
-  while Assigned(Result) and Result^.Deleted do
-  begin
+  repeat
     Inc(n);
-    Result := pList^.GetByIndex(n);
-  end;
+    if n < List.Count then
+      Result := List.Items[n]
+    else
+      Result := nil;
+
+    if Assigned(Result) and (not Result.Deleted) then
+      Exit;
+
+  until n >= List.Count;
 end;
 
-function TOfficeListIterator.Next(out AValue: POffice): Boolean;
+function TOfficeListIterator.Next(out AValue: TOffice): Boolean;
 begin
   AValue := GetNext();
   Result := Assigned(AValue);
@@ -186,9 +193,9 @@ end;
 
 { TTicket }
 
-procedure TTicket.Init();
+constructor TTicket.Create();
 begin
-  Id := -1;
+  inherited Create();
   Caption := '';
 
   Num := 0;
@@ -198,105 +205,75 @@ begin
   TimeStart := 0;
   TimeFinish := 0;
 
-  OfficeId := 0;
+  OfficeNum := 0;
   Deleted := False;
 end;
 
 { TTicketList }
 
-procedure TTicketList.Init();
+procedure TTicketList.Notify(Ptr: Pointer; Action: TListNotification);
 begin
-  SetLength(Items, 0);
-  Count := 0;
+  inherited Notify(Ptr, Action);
+  if Action = lnDeleted then
+    TTicket(Ptr).Free();
 end;
 
-function TTicketList.Add(const AValue: TTicket): Integer;
+function TTicketList.GetItem(AIndex: Integer): TTicket;
+begin
+  Result := TTicket(Get(AIndex));
+end;
+
+procedure TTicketList.SetItem(AIndex: Integer; AValue: TTicket);
+begin
+  Put(AIndex, AValue);
+end;
+
+function TTicketList.GetItemByNum(ANum: Integer): TTicket;
 var
   i: Integer;
 begin
-  Result := -1;
-  for i := 0 to Length(Items)-1 do
+  for i := 0 to Count-1 do
   begin
-    if Items[i].Deleted then
-    begin
-      Result := i;
-      Break;
-    end;
+    Result := TTicket(Items[i]);
+    if Result.Num = ANum then
+      Exit;
   end;
-
-  if Result = -1 then
-  begin
-    Result := Length(Items);
-    SetLength(Items, Result+1);
-  end;
-
-  Items[Result] := AValue;
-  Items[Result].Id := Result;
-  Items[Result].Deleted := False;
-  Inc(Count);
+  Result := nil;
 end;
 
-function TTicketList.Delete(AId: Integer): Boolean;
-begin
-  Result := (not Items[AId].Deleted);
-  if Result then
-  begin
-    Items[AId].Deleted := True;
-    Dec(Count);
-  end;
-end;
-
-function TTicketList.Get(AId: Integer): PTicket;
-begin
-  Result := Addr(Items[AId]);
-end;
-
-function TTicketList.GetByIndex(AIndex: Integer): PTicket;
-begin
-  if AIndex < Length(Items) then
-    Result := Addr(Items[AIndex])
-  else
-    Result := nil;
-end;
-
-function TTicketList.GetCount(): Integer;
-begin
-  Result := Count;
-end;
-
-function TTicketList.GetMaxNum(AOfficeId: Integer): Integer;
+function TTicketList.GetMaxNum(AOfficeNum: Integer): Integer;
 var
   i: Integer;
-  pTicketItem: PTicket;
+  Item: TTicket;
 begin
   Result := 0;
-  for i := Low(Items) to High(Items) do
+  for i := 0 to Count-1 do
   begin
-    pTicketItem := Addr(Items[i]);
-    if (not pTicketItem^.Deleted) and (pTicketItem^.OfficeId = AOfficeId) then
+    Item := Items[i];
+    if (not Item.Deleted) and (Item.OfficeNum = AOfficeNum) then
     begin
-      if Result < pTicketItem^.Num then
-        Result := pTicketItem^.Num;
+      if Result < Item.Num then
+        Result := Item.Num;
     end;
   end;
 end;
 
-function TTicketList.GetTopTicket(AOfficeId: Integer): PTicket;
+function TTicketList.GetTopTicket(AOfficeNum: Integer): TTicket;
 var
   i, MinNum: Integer;
-  pTicketItem: PTicket;
+  Item: TTicket;
 begin
   Result := nil;
   MinNum := MaxInt;
-  for i := Low(Items) to High(Items) do
+  for i := 0 to Count-1 do
   begin
-    pTicketItem := Addr(Items[i]);
-    if (not pTicketItem^.Deleted) and (pTicketItem^.OfficeId = AOfficeId) then
+    Item := Items[i];
+    if (not Item.Deleted) and (Item.OfficeNum = AOfficeNum) then
     begin
-      if MinNum > pTicketItem^.Num then
+      if MinNum > Item.Num then
       begin
-        MinNum := pTicketItem^.Num;
-        Result := pTicketItem;
+        MinNum := Item.Num;
+        Result := Item;
       end;
     end;
   end;
@@ -304,9 +281,9 @@ end;
 
 { TOffice }
 
-procedure TOffice.Init();
+constructor TOffice.Create();
 begin
-  Id := -1;
+  inherited Create();
   Num := 0;
   Caption := '';
   Comment := '';
@@ -316,6 +293,13 @@ begin
 
   TicketPrefix := '';
   GroupId := -1;
+
+  TicketCount := 0;
+  TicketNum := 0;
+
+  HostPort := '';
+
+  ButtonPressTimestamp := 0;
 end;
 
 function TOffice.IsVisible(): Boolean;
@@ -325,79 +309,34 @@ end;
 
 { TOfficeList }
 
-procedure TOfficeList.Init();
+procedure TOfficeList.Notify(Ptr: Pointer; Action: TListNotification);
 begin
-  SetLength(Items, 0);
-  Count := 0;
+  inherited Notify(Ptr, Action);
+  if Action = lnDeleted then
+    TOffice(Ptr).Free();
 end;
 
-function TOfficeList.Add(const AValue: TOffice): Integer;
+function TOfficeList.GetItem(AIndex: Integer): TOffice;
+begin
+  Result := TOffice(Get(AIndex));
+end;
+
+procedure TOfficeList.SetItem(AIndex: Integer; AValue: TOffice);
+begin
+  Put(AIndex, AValue);
+end;
+
+function TOfficeList.GetByNum(ANum: Integer): TOffice;
 var
   i: Integer;
 begin
-  Result := -1;
-  for i := 0 to Length(Items)-1 do
+  for i := 0 to Count-1 do
   begin
-    if Items[i].Deleted then
-    begin
-      Result := i;
-      Break;
-    end;
+    Result := TOffice(Items[i]);
+    if (not Result.Deleted) and (Result.Num = ANum) then
+      Exit;
   end;
-
-  if Result = -1 then
-  begin
-    Result := Length(Items);
-    SetLength(Items, Result+1);
-  end;
-
-  Items[Result] := AValue;
-  Items[Result].Id := Result;
-  Items[Result].Deleted := False;
-  Inc(Count);
-end;
-
-function TOfficeList.Delete(AId: Integer): Boolean;
-begin
-  Result := (not Items[AId].Deleted);
-  if Result then
-  begin
-    Items[AId].Deleted := True;
-    Dec(Count);
-  end;
-end;
-
-function TOfficeList.Get(AId: Integer): POffice;
-begin
-  Result := Addr(Items[AId]);
-end;
-
-function TOfficeList.GetByIndex(AIndex: Integer): POffice;
-begin
-  if AIndex < Length(Items) then
-    Result := Addr(Items[AIndex])
-  else
-    Result := nil;
-end;
-
-function TOfficeList.GetByNum(ANum: Integer): POffice;
-var
-  i: Integer;
-begin
   Result := nil;
-  for i := 0 to Length(Items)-1 do
-  begin
-    if (not Items[i].Deleted) and (Items[i].Num = ANum) then
-    begin
-      Result := Addr(Items[i]);
-      Break;
-    end;
-  end;
-end;
-
-function TOfficeList.GetCount(): Integer;
-begin
-  Result := Count;
 end;
 
 end.

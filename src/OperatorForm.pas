@@ -6,7 +6,7 @@ interface
 
 uses
   Classes, SysUtils, Forms, Controls, Graphics, Dialogs, ExtCtrls, ActnList,
-  Menus, StdCtrls, lNetComponents, ZhdunItems, ZhdunOperatorUnit, lNet;
+  Menus, StdCtrls, lNetComponents, ZhdunItems, ZhdunOperatorUnit, lNet, RFUtils;
 
 type
 
@@ -23,6 +23,7 @@ type
     lbTotalTicketsLabel: TLabel;
     lbCurTicket: TLabel;
     lbCurTicketLabel: TLabel;
+    panNoLink: TPanel;
     Timer1s: TTimer;
     Timer100ms: TTimer;
     UDPConn: TLUDPComponent;
@@ -42,6 +43,7 @@ type
     procedure UDPConnReceive(aSocket: TLSocket);
   private
     FOperatorManager: TOperatorManager;
+    FBtnNextLockTC: Int64;
 
     procedure PostCmdHandler(const S: string);
   public
@@ -72,6 +74,8 @@ end;
 procedure TFormOperator.actNextTicketExecute(Sender: TObject);
 begin
   FOperatorManager.NextTicket();
+  actNextTicket.Enabled := False;
+  FBtnNextLockTC := GetTickCount64();
 end;
 
 procedure TFormOperator.actPauseExecute(Sender: TObject);
@@ -83,18 +87,22 @@ procedure TFormOperator.Timer100msTimer(Sender: TObject);
 begin
   UpdateLabel(lbCurTicket, IntToStr(FOperatorManager.Office.TicketNum));
   UpdateLabel(lbTotalTickets, IntToStr(FOperatorManager.Office.TicketCount));
+  if (not FOperatorManager.IsConnected) <> panNoLink.Visible then
+  begin
+    panNoLink.Visible := (not FOperatorManager.IsConnected);
+  end;
+
+  if (not actNextTicket.Enabled)
+  and (SecondsBetweenTicks(GetTickCount64(), FBtnNextLockTC) > BTN_NEXT_TIMEOUT) then
+  begin
+    actNextTicket.Enabled := True;
+    FBtnNextLockTC := 0;
+  end;
 end;
 
 procedure TFormOperator.Timer1sTimer(Sender: TObject);
 begin
-  if FOperatorManager.NeedUpdateInfo then
-  begin
-    FOperatorManager.PostCmd('INFO_REQ');
-  end
-  else
-  begin
-    FOperatorManager.PostCmd('STATE_REQ');
-  end;
+  FOperatorManager.Tick();
 end;
 
 procedure TFormOperator.UDPConnReceive(aSocket: TLSocket);
@@ -111,6 +119,8 @@ begin
   Assert(Length(S) <= 500);
   if Length(S) <= 500 then
   begin
+    if not (FOperatorManager.IsConnected) then
+      UdpConn.Connect(FOperatorManager.MonitorHost, FOperatorManager.MonitorPort);
     UdpConn.SendMessage(S, FOperatorManager.MonitorHost + ':' + IntToStr(FOperatorManager.MonitorPort));
   end;
 end;

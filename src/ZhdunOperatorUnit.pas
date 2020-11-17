@@ -7,18 +7,26 @@ interface
 uses
   Classes, SysUtils, ZhdunItems, RFUtils, IniFiles;
 
+const
+  LINK_TIMEOUT = 30; // seconds
+  BTN_NEXT_TIMEOUT = 2; // seconds
+
 type
 
   { TOperatorManager }
 
   TOperatorManager = class
   private
+    FOffice: TOffice;
     FOnPostCmd: TGetStrProc;
+
+    FReqTimestamp: Int64;
+    FStateTimestamp: Int64;
   public
-    Office: TOffice;
     MonitorHost: string;
     MonitorPort: Integer;
     NeedUpdateInfo: Boolean;
+    IsConnected: Boolean;
 
     procedure AfterConstruction; override;
     procedure BeforeDestruction; override;
@@ -26,12 +34,16 @@ type
     procedure LoadConfig();
     procedure SaveConfig();
 
-    function NextTicket(): PTicket;
+    procedure Tick();
+
+    function NextTicket(): Boolean;
     procedure Pause();
 
     procedure PostCmd(ACmdText: string);
 
     procedure ProcessCmd(ACmdText: string);
+
+    property Office: TOffice read FOffice;
 
     property OnPostCmd: TGetStrProc read FOnPostCmd write FOnPostCmd;
   end;
@@ -43,12 +55,14 @@ implementation
 procedure TOperatorManager.AfterConstruction;
 begin
   inherited AfterConstruction;
-  Office.Init();
+
+  FOffice := TOffice.Create();
   NeedUpdateInfo := True;
 end;
 
 procedure TOperatorManager.BeforeDestruction;
 begin
+  FreeAndNil(FOffice);
   inherited BeforeDestruction;
 end;
 
@@ -57,7 +71,6 @@ var
   ini: TMemIniFile;
   sSection: string;
   i, n: Integer;
-  OfficeItem: TOffice;
 begin
   ini := TMemIniFile.Create('zhdun_operator.ini');
   try
@@ -107,9 +120,30 @@ begin
   end;
 end;
 
-function TOperatorManager.NextTicket(): PTicket;
+procedure TOperatorManager.Tick();
+begin
+  if NeedUpdateInfo then
+  begin
+    PostCmd('INFO_REQ');
+  end
+  else
+  begin
+    PostCmd('STATE_REQ');
+  end;
+
+  FReqTimestamp := GetTickCount64();
+  if (not NeedUpdateInfo) and (SecondsBetweenTicks(FReqTimestamp, FStateTimestamp) > LINK_TIMEOUT) then
+  begin
+    NeedUpdateInfo := True;
+    IsConnected := False;
+  end;
+
+end;
+
+function TOperatorManager.NextTicket(): Boolean;
 begin
   PostCmd('NEXT_TICKET');
+  Result := True;
 end;
 
 procedure TOperatorManager.Pause();
@@ -129,7 +163,7 @@ procedure TOperatorManager.ProcessCmd(ACmdText: string);
 var
   s, ss, sCmd: string;
   iNum: Integer;
-  pTmpOffice: POffice;
+  TmpOffice: TOffice;
 begin
   ss := ACmdText;
   sCmd := ExtractFirstWord(ss);
@@ -151,6 +185,9 @@ begin
 
         s := ExtractFirstWord(ss); // ticket_num
         Office.TicketNum := StrToIntDef(s, 0);
+
+        FStateTimestamp := GetTickCount64();
+        IsConnected := True;
       end
       else
       // OFFICE 1: INFO <Caption> <TicketPrefix> <IconName> <Comment>
@@ -168,6 +205,8 @@ begin
         Office.Comment := Trim(ss); // Comment
 
         NeedUpdateInfo := False;
+        IsConnected := True;
+        PostCmd('STATE_REQ');
       end;
     end;
 
@@ -180,10 +219,10 @@ begin
     iNum := StrToIntDef(s, -1);
     if iNum <> -1 then
     begin
-      pTmpOffice := OfficeList.GetByNum(iNum);
-      if Assigned(pTmpOffice) then
+      TmpOffice := OfficeList.GetByNum(iNum);
+      if Assigned(TmpOffice) then
       begin
-        CreateTicket(pTmpOffice^.Id);
+        CreateTicket(TmpOffice.Num);
         UpdateVisualTickets();
       end;
     end; }
@@ -196,10 +235,10 @@ begin
     iNum := StrToIntDef(s, -1);
     if iNum <> -1 then
     begin
-      pTmpOffice := OfficeList.GetByNum(iNum);
-      if Assigned(pTmpOffice) then
+      TmpOffice := OfficeList.GetByNum(iNum);
+      if Assigned(TmpOffice) then
       begin
-        NextTicket(pTmpOffice^.Id);
+        NextTicket(TmpOffice.Num);
         UpdateVisualTickets();
       end;
     end;  }

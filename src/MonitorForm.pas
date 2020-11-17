@@ -19,6 +19,8 @@ type
     Timer1000ms: TTimer;
     procedure FormResize(Sender: TObject);
     procedure LUDPComponent1Receive(aSocket: TLSocket);
+    procedure PaintBoxMouseUp(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Integer);
     procedure PaintBoxPaint(Sender: TObject);
     procedure Timer1000msTimer(Sender: TObject);
   private
@@ -33,8 +35,11 @@ type
 
     procedure DrawBackground(AC: TCanvas);
     procedure DrawHeader(AC: TCanvas);
-    procedure DrawTicket(AC: TCanvas; const ATicket: TVisualTicket);
+    procedure DrawOffice(AC: TCanvas; const AOffice: TVisualOffice);
     procedure DrawButton(AC: TCanvas; const AButton: TVisualButton);
+    procedure DrawTicket(AC: TCanvas; const ATicket: TVisualTicket);
+
+    procedure ProcessClick(X, Y: Integer);
 
     procedure OnSendCmdHandler(const ACmdText, AHostPort: string);
   public
@@ -51,6 +56,7 @@ var
 
 const
   csHeaderText = 'СУО "Ждун" 2020 (С) serbod.com';
+  csTicketNoteText = 'Запишите номер билета';
 
 implementation
 
@@ -61,7 +67,7 @@ implementation
 procedure TFormMonitor.PaintBoxPaint(Sender: TObject);
 var
   c: TCanvas;
-  vt: TVisualTicket;
+  vt: TVisualOffice;
   i: Integer;
 begin
   c := PaintBox.Canvas;
@@ -73,16 +79,21 @@ begin
   vt.OfficeText := 'Кабинет 234';
   vt.TicketText := '123';
 
-  DrawTicket(c, vt);}
+  DrawOffice(c, vt);}
 
-  for i := Low(FTicketManager.VisualTickets) to High(FTicketManager.VisualTickets) do
+  for i := Low(FTicketManager.VisualOffices) to High(FTicketManager.VisualOffices) do
   begin
-    DrawTicket(c, FTicketManager.VisualTickets[i]);
+    DrawOffice(c, FTicketManager.VisualOffices[i]);
   end;
 
   for i := Low(FTicketManager.VisualButtons) to High(FTicketManager.VisualButtons) do
   begin
     DrawButton(c, FTicketManager.VisualButtons[i]);
+  end;
+
+  if FTicketManager.VisTicket.Visible then
+  begin
+    DrawTicket(c, FTicketManager.VisTicket);
   end;
 end;
 
@@ -104,6 +115,12 @@ begin
   sHostPort := aSocket.PeerAddress + ':' + IntToStr(aSocket.PeerPort);
   if s <> '' then
     FTicketManager.ProcessCmd(s, sHostPort);
+end;
+
+procedure TFormMonitor.PaintBoxMouseUp(Sender: TObject; Button: TMouseButton;
+  Shift: TShiftState; X, Y: Integer);
+begin
+  ProcessClick(X, Y);
 end;
 
 procedure TFormMonitor.AfterResize();
@@ -194,10 +211,11 @@ begin
   end;
 end; }
 
-procedure TFormMonitor.DrawTicket(AC: TCanvas; const ATicket: TVisualTicket);
+procedure TFormMonitor.DrawOffice(AC: TCanvas; const AOffice: TVisualOffice);
 var
   r: TRect;
   s: string;
+  iYShift: Integer;
 begin
   // frame
   AC.DrawingMode := dmAlphaBlend;
@@ -206,9 +224,9 @@ begin
   AC.Brush.Style := bsClear;
   AC.Brush.Color := clWhite;
 
-  r.TopLeft := ATicket.Pos;
-  r.Width := ATicket.Size.X;
-  r.Height := ATicket.Size.Y;
+  r.TopLeft := AOffice.Pos;
+  r.Width := AOffice.Size.X;
+  r.Height := AOffice.Size.Y;
   AC.FillRect(r);
 
   // == Office text
@@ -221,11 +239,13 @@ begin
   //AC.Font.Color := clLtGray;
   //AC.TextOut(5, 5, FHeaderText);
 
-  AC.Font.Color := clBlack;
-  AC.TextOut(r.Left + 10, r.Top + 10, ATicket.OfficeText);
+  iYShift := (AC.Font.Size div 3);
 
   AC.Font.Color := clBlack;
-  AC.TextOut(r.Left + ((r.Width div 3) * 2), r.Top + 10, ATicket.TicketText);
+  AC.TextOut(r.Left + 10, r.Top + iYShift, AOffice.OfficeText);
+
+  AC.Font.Color := clBlack;
+  AC.TextOut(r.Left + ((r.Width div 3) * 2), r.Top + iYShift, AOffice.TicketText);
 end;
 
 procedure TFormMonitor.DrawButton(AC: TCanvas; const AButton: TVisualButton);
@@ -242,6 +262,15 @@ begin
 
   r := AButton.Rect;
   AC.FillRect(r);
+
+  if AButton.Marked then
+  begin
+    // border for selected item
+    AC.Pen.Style := psDash;
+    AC.Pen.Color := clBlue;
+    AC.Pen.Width := 4;
+    AC.Rectangle(R);
+  end;
 
   // == Office text
   AC.Brush.Style := bsClear;
@@ -261,6 +290,105 @@ begin
     AC.Font.Color := clBlack;
     AC.Font.Size := r.Height div 16;
     AC.TextOut(r.Left + 10, r.Top + ((r.Height div 3) * 2), AButton.SubText);
+  end;
+end;
+
+procedure TFormMonitor.DrawTicket(AC: TCanvas; const ATicket: TVisualTicket);
+var
+  r: TRect;
+  ts, tso: TSize;
+  x, y, nx, ny: Integer;
+  s: string;
+begin
+  // frame
+  AC.DrawingMode := dmAlphaBlend;
+
+  //AC.Brush.Style := bsSolid;
+  AC.Brush.Style := bsClear;
+  AC.Brush.Color := clWhite;
+
+  r := ATicket.Rect;
+  AC.FillRect(r);
+
+  // == Office text
+  AC.Brush.Style := bsClear;
+  AC.Font.Name := 'Tahoma';
+  AC.Font.Size := r.Width div 10;
+  //AC.Font.Quality := fqCleartypeNatural;
+  AC.Font.Quality := fqAntialiased;
+
+  //AC.Font.Color := clLtGray;
+  //AC.TextOut(5, 5, FHeaderText);
+
+  AC.Font.Color := clBlack;
+  tso := AC.TextExtent(ATicket.OfficeText);
+  AC.TextOut(r.Left + 10, r.Top + 10, ATicket.OfficeText);
+
+  // === ticket text
+  AC.Brush.Style := bsClear;
+  AC.Font.Name := 'Tahoma';
+  AC.Font.Size := r.Width div 5;
+  //AC.Font.Quality := fqCleartypeNatural;
+  AC.Font.Quality := fqAntialiased;
+
+  //AC.Font.Color := clLtGray;
+  //AC.TextOut(5, 5, FHeaderText);
+
+  AC.Font.Color := clBlack;
+
+  ts := AC.TextExtent(ATicket.TicketText);
+  x := r.Left + ((ATicket.Rect.Width - ts.cx) div 2);
+  y := r.Top + 10 + tso.Height + 10;
+  AC.TextOut(x, y, ATicket.TicketText);
+
+  // === note text
+  AC.Brush.Style := bsClear;
+  AC.Font.Name := 'Tahoma';
+  AC.Font.Size := r.Width div 10;
+  //AC.Font.Quality := fqCleartypeNatural;
+  AC.Font.Quality := fqAntialiased;
+
+  //AC.Font.Color := clLtGray;
+  //AC.TextOut(5, 5, FHeaderText);
+
+  AC.Font.Color := clBlack;
+
+  //ts := AC.TextExtent(csTicketNoteText);
+  nx := r.Left + 10;
+  ny := y + ts.Height + 10;
+  AC.TextOut(nx, ny, csTicketNoteText);
+
+end;
+
+procedure TFormMonitor.ProcessClick(X, Y: Integer);
+var
+  i: Integer;
+  pTmpVisButton: PVisualButton;
+  OfficeItem: TOffice;
+  TmpTicket: TTicket;
+
+begin
+  for i := Low(FTicketManager.VisualButtons) to High(FTicketManager.VisualButtons) do
+  begin
+    pTmpVisButton := Addr(FTicketManager.VisualButtons[i]);
+    if pTmpVisButton^.Rect.Contains(Point(X, Y)) then
+    begin
+      OfficeItem := FTicketManager.OfficeList.GetByNum(pTmpVisButton^.OfficeNum);
+      if Assigned(OfficeItem) then
+      begin
+        TmpTicket := FTicketManager.CreateTicket(OfficeItem.Num);
+        if Assigned(TmpTicket) then
+        begin
+          FTicketManager.VisTicket.OfficeNum := TmpTicket.OfficeNum;
+          FTicketManager.VisTicket.TicketNum := TmpTicket.Num;
+          FTicketManager.VisTicket.TimeCreate := TmpTicket.TimeCreate;
+
+          FTicketManager.VisTicket.OfficeText := OfficeItem.Caption;
+          FTicketManager.VisTicket.TicketText := TmpTicket.Caption;
+          FTicketManager.VisTicket.Visible := True;
+        end;
+      end;
+    end;
   end;
 end;
 
@@ -318,7 +446,7 @@ end;
 
 procedure TFormMonitor.UpdateView();
 begin
-  FTicketManager.UpdateVisualTickets();
+  FTicketManager.UpdateVisualOffices();
   FTicketManager.UpdateVisualButtons();
   Invalidate();
 end;
@@ -326,14 +454,14 @@ end;
 procedure TFormMonitor.TestTickets();
 var
   OfficeIterator: TOfficeListIterator;
-  pOfficeItem: POffice;
+  OfficeItem: TOffice;
 begin
   OfficeIterator.Init(FTicketManager.OfficeList);
-  while OfficeIterator.Next(pOfficeItem) do
+  while OfficeIterator.Next(OfficeItem) do
   begin
-    FTicketManager.CreateTicket(pOfficeItem^.Id);
-    FTicketManager.CreateTicket(pOfficeItem^.Id);
-    FTicketManager.CreateTicket(pOfficeItem^.Id);
+    FTicketManager.CreateTicket(OfficeItem.Num);
+    FTicketManager.CreateTicket(OfficeItem.Num);
+    FTicketManager.CreateTicket(OfficeItem.Num);
   end;
 end;
 

@@ -9,6 +9,10 @@ uses
   Classes, SysUtils, IniFiles;
 
 type
+  TSendCmdEvent = procedure(const ACmdText, AHostPort: string) of object;
+
+  TZhdunRole = (zrNone, zrServer, zrMonitor, zrOperator, zrAdmin);
+  TZhdunRoles = set of TZhdunRole;
 
   { IZOffice }
 

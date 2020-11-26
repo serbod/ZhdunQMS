@@ -14,15 +14,18 @@ type
   { TFormMonitor }
 
   TFormMonitor = class(TForm)
-    LUDPComponent1: TLUDPComponent;
+    UDPUplink: TLUDPComponent;
+    UDPListener: TLUDPComponent;
     PaintBox: TPaintBox;
     Timer1000ms: TTimer;
     procedure FormResize(Sender: TObject);
-    procedure LUDPComponent1Receive(aSocket: TLSocket);
+    procedure UDPListenerReceive(aSocket: TLSocket);
     procedure PaintBoxMouseUp(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Integer);
     procedure PaintBoxPaint(Sender: TObject);
     procedure Timer1000msTimer(Sender: TObject);
+    procedure UDPUplinkError(const msg: string; aSocket: TLSocket);
+    procedure UDPUplinkReceive(aSocket: TLSocket);
   private
     FTicketManager: TTicketManager;
 
@@ -42,6 +45,7 @@ type
     procedure ProcessClick(X, Y: Integer);
 
     procedure OnSendCmdHandler(const ACmdText, AHostPort: string);
+    procedure OnUplinkSendCmdHandler(const ACmdText, AHostPort: string);
   public
     procedure AfterConstruction; override;
     procedure BeforeDestruction; override;
@@ -102,12 +106,27 @@ begin
   UpdateView();
 end;
 
+procedure TFormMonitor.UDPUplinkError(const msg: string; aSocket: TLSocket);
+begin
+
+end;
+
+procedure TFormMonitor.UDPUplinkReceive(aSocket: TLSocket);
+var
+  s, sHostPort: string;
+begin
+  aSocket.GetMessage(s);
+  sHostPort := aSocket.PeerAddress + ':' + IntToStr(aSocket.PeerPort);
+  if s <> '' then
+    FTicketManager.ProcessCmd(s, sHostPort);
+end;
+
 procedure TFormMonitor.FormResize(Sender: TObject);
 begin
   AfterResize();
 end;
 
-procedure TFormMonitor.LUDPComponent1Receive(aSocket: TLSocket);
+procedure TFormMonitor.UDPListenerReceive(aSocket: TLSocket);
 var
   s, sHostPort: string;
 begin
@@ -396,7 +415,22 @@ procedure TFormMonitor.OnSendCmdHandler(const ACmdText, AHostPort: string);
 begin
   if (ACmdText <> '') and (AHostPort <> '') then
   begin
-    LUDPComponent1.SendMessage(ACmdText, AHostPort);
+    UDPListener.SendMessage(ACmdText, AHostPort);
+  end;
+end;
+
+procedure TFormMonitor.OnUplinkSendCmdHandler(const ACmdText,
+  AHostPort: string);
+begin
+  Assert(Length(ACmdText) <= 500);
+  if Length(ACmdText) <= 500 then
+  begin
+    if not (FTicketManager.UplinkConnected) then
+    begin
+      UDPUplink.Disconnect(True);
+      UDPUplink.Connect(FTicketManager.UplinkHost, FTicketManager.UplinkPort);
+    end;
+    UDPUplink.SendMessage(ACmdText, FTicketManager.UplinkHost + ':' + IntToStr(FTicketManager.UplinkPort));
   end;
 end;
 
@@ -433,7 +467,7 @@ begin
     FBGFileName := '';
 
 
-  LUDPComponent1.Listen(FTicketManager.UDPPort);
+  UDPListener.Listen(FTicketManager.UDPPort);
 
   TestTickets();
 end;

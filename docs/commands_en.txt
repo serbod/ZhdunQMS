@@ -1,0 +1,58 @@
+== Prefixes ==
+
+ OFFICE <office_num>: <command> [params]
+
+Command sent from server to office (downlink with Operator role)
+
+
+== Commands ==
+
+=== INFO ===
+
+ INFO <Caption> <TicketPrefix> <IconName> <Comment> 
+
+* Caption - caption for office
+* TicketPrefix - prefix for ticket numbers
+* IconName - name of office icon
+* Comment - additional text info for office
+
+Office info. Server send it to downlinks. 
+
+
+=== STATE ===
+
+ STATE <tickets_count> [ticket_num]
+
+* tickets_count - total tickets in queue
+* ticket_num - current ticket number, optional
+
+Office queue state. Server send it to downlinks.
+
+
+=== INFO_REQ ===
+
+ INFO_REQ
+
+Ask server for office info. If prefix not specified, ask for all offices.
+
+
+=== STATE_REQ ===
+
+ STATE_REQ
+
+Ask server for office queue state. If prefix not specified, ask for all offices.
+
+
+=== CREATE_TICKET ===
+
+ CREATE_TICKET
+
+Downlink send it to server.
+
+
+=== NEXT_TICKET ===
+
+ NEXT_TICKET
+
+Downlink send it to server.
+

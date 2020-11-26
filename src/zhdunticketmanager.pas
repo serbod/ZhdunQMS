@@ -11,17 +11,19 @@ const
   ciTicketShowTimeout = 10; // seconds
 
 type
-  TSendCmdEvent = procedure(const ACmdText, AHostPort: string) of object;
-
   { TTicketManager }
 
   TTicketManager = class
   private
     FTicketList: TTicketList;
     FOfficeList: TOfficeList;
-    FOnSendCmd: TSendCmdEvent;
-  public
 
+    FRoles: TZhdunRoles;
+
+    FOnSendCmd: TSendCmdEvent;
+    FOnUplinkSendCmd: TSendCmdEvent;
+
+  public
     VisualOffices: TVisualOfficeArray;
     VisualButtons: TVisualButtonArray;
 
@@ -38,6 +40,10 @@ type
     VisTicket: TVisualTicket;
 
     UDPPort: Integer;
+
+    UplinkHost: string;
+    UplinkPort: Integer;
+    UplinkConnected: Boolean;
 
     procedure AfterConstruction; override;
     procedure BeforeDestruction; override;
@@ -62,7 +68,10 @@ type
     property TicketList: TTicketList read FTicketList;
     property OfficeList: TOfficeList read FOfficeList;
 
+    property Roles: TZhdunRoles read FRoles;
+
     property OnSendCmd: TSendCmdEvent read FOnSendCmd write FOnSendCmd;
+    property OnUplinkSendCmd: TSendCmdEvent read FOnUplinkSendCmd write FOnUplinkSendCmd;
   end;
 
 
@@ -77,6 +86,14 @@ begin
   FOfficeList := TOfficeList.Create();
 
   VisTicket.Visible := False;
+  MaxVisTickets := 6;
+  TicketBorderSize := 5;
+
+  VisButtonBorderSize := 5;
+  MaxVisButtons := 3;
+
+  UDPPort := 4444;
+  UplinkPort := 4444;
 end;
 
 procedure TTicketManager.BeforeDestruction;
@@ -95,28 +112,43 @@ var
 begin
   ini := TMemIniFile.Create('zhdun.ini');
   try
-    sSection := 'Main';
-    MaxVisTickets := ini.ReadInteger(sSection, 'MaxVisTickets', MaxVisTickets);
-    TicketBorderSize := ini.ReadInteger(sSection, 'TicketBorderSize', TicketBorderSize);
-    UDPPort := ini.ReadInteger(sSection, 'UDPPort', UDPPort);
-
-    // Office list
-    n := ini.ReadInteger(sSection, 'OfficeCount', 0);
-    for i := 1 to n do
+    sSection := 'Monitor';
+    if ini.SectionExists(sSection) then
     begin
-      sSection := 'Office_' + IntToStr(i);
-      if not ini.SectionExists(sSection) then
-        Continue;
+      FRoles := FRoles + zrMonitor;
 
-      OfficeItem := TOffice.Create();
-      OfficeItem.Num := ini.ReadInteger(sSection, 'Num', OfficeItem.Num);
-      OfficeItem.Caption := ini.ReadString(sSection, 'Caption', OfficeItem.Caption);
-      OfficeItem.Comment := ini.ReadString(sSection, 'Comment', OfficeItem.Comment);
-      OfficeItem.IconName := ini.ReadString(sSection, 'IconName', OfficeItem.IconName);
-      OfficeItem.TicketPrefix := ini.ReadString(sSection, 'TicketPrefix', OfficeItem.TicketPrefix);
-      OfficeItem.GroupId := ini.ReadInteger(sSection, 'GroupId', OfficeItem.GroupId);
+      MaxVisTickets := ini.ReadInteger(sSection, 'MaxVisTickets', MaxVisTickets);
+      TicketBorderSize := ini.ReadInteger(sSection, 'TicketBorderSize', TicketBorderSize);
 
-      OfficeList.Add(OfficeItem);
+      UplinkPort := ini.ReadInteger(sSection, 'UplinkPort', UplinkPort);
+      UplinkHost := ini.ReadString(sSection, 'UplinkHost', UplinkHost);
+    end;
+
+    sSection := 'Server';
+    if ini.SectionExists(sSection) then
+    begin
+      FRoles := FRoles + zrServer;
+      UDPPort := ini.ReadInteger(sSection, 'UDPPort', UDPPort);
+
+      // Office list
+      n := ini.ReadInteger(sSection, 'OfficeCount', 0);
+      for i := 1 to n do
+      begin
+        sSection := 'Office_' + IntToStr(i);
+        if not ini.SectionExists(sSection) then
+          Continue;
+
+        OfficeItem := TOffice.Create();
+        OfficeItem.Num := ini.ReadInteger(sSection, 'Num', OfficeItem.Num);
+        OfficeItem.Caption := ini.ReadString(sSection, 'Caption', OfficeItem.Caption);
+        OfficeItem.Comment := ini.ReadString(sSection, 'Comment', OfficeItem.Comment);
+        OfficeItem.IconName := ini.ReadString(sSection, 'IconName', OfficeItem.IconName);
+        OfficeItem.TicketPrefix := ini.ReadString(sSection, 'TicketPrefix', OfficeItem.TicketPrefix);
+        OfficeItem.GroupId := ini.ReadInteger(sSection, 'GroupId', OfficeItem.GroupId);
+
+        OfficeList.Add(OfficeItem);
+      end;
+
     end;
 
   finally
@@ -134,29 +166,41 @@ var
 begin
   ini := TMemIniFile.Create('zhdun.ini');
   try
-    sSection := 'Main';
-    ini.WriteInteger(sSection, 'MaxVisTickets', MaxVisTickets);
-    ini.WriteInteger(sSection, 'TicketBorderSize', TicketBorderSize);
-    ini.WriteInteger(sSection, 'UDPPort', UDPPort);
-
-    n := 0;
-    OfficeIterator.Init(OfficeList);
-    while OfficeIterator.Next(OfficeItem) do
+    if zrMonitor in FRoles then
     begin
-      Inc(n);
-      sSection := 'Office_' + IntToStr(n+1);
-      ini.WriteInteger(sSection, 'Num', OfficeItem.Num);
-      ini.WriteString(sSection, 'Caption', OfficeItem.Caption);
-      ini.WriteString(sSection, 'Comment', OfficeItem.Comment);
-      ini.WriteString(sSection, 'IconName', OfficeItem.IconName);
-      //State: TOfficeState;
-      //Deleted: Boolean;
+      sSection := 'Monitor';
+      ini.WriteInteger(sSection, 'MaxVisTickets', MaxVisTickets);
+      ini.WriteInteger(sSection, 'TicketBorderSize', TicketBorderSize);
 
-      ini.WriteString(sSection, 'TicketPrefix', OfficeItem.TicketPrefix);
-      ini.WriteInteger(sSection, 'GroupId', OfficeItem.GroupId);
+      ini.WriteInteger(sSection, 'UplinkPort', UplinkPort);
+      ini.WriteString(sSection, 'UplinkHost', UplinkHost);
     end;
 
-    ini.WriteInteger('Main', 'OfficeCount', n);
+    if zrServer in FRoles then
+    begin
+      sSection := 'Server';
+      ini.WriteInteger(sSection, 'UDPPort', UDPPort);
+
+      n := 0;
+      OfficeIterator.Init(OfficeList);
+      while OfficeIterator.Next(OfficeItem) do
+      begin
+        Inc(n);
+        sSection := 'Office_' + IntToStr(n+1);
+        ini.WriteInteger(sSection, 'Num', OfficeItem.Num);
+        ini.WriteString(sSection, 'Caption', OfficeItem.Caption);
+        ini.WriteString(sSection, 'Comment', OfficeItem.Comment);
+        ini.WriteString(sSection, 'IconName', OfficeItem.IconName);
+        //State: TOfficeState;
+        //Deleted: Boolean;
+
+        ini.WriteString(sSection, 'TicketPrefix', OfficeItem.TicketPrefix);
+        ini.WriteInteger(sSection, 'GroupId', OfficeItem.GroupId);
+      end;
+
+      ini.WriteInteger('Server', 'OfficeCount', n);
+    end;
+
   finally
     FreeAndNil(ini);
   end;

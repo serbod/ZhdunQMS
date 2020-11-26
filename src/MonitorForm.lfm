@@ -22,11 +22,19 @@ object FormMonitor: TFormMonitor
     Left = 240
     Top = 77
   end
-  object LUDPComponent1: TLUDPComponent
+  object UDPListener: TLUDPComponent
     Port = 4444
-    OnReceive = LUDPComponent1Receive
+    OnReceive = UDPListenerReceive
     Timeout = 0
     Left = 243
     Top = 211
+  end
+  object UDPUplink: TLUDPComponent
+    Port = 0
+    OnReceive = UDPUplinkReceive
+    OnError = UDPUplinkError
+    Timeout = 0
+    Left = 243
+    Top = 272
   end
 end

@@ -120,7 +120,10 @@ begin
   if Length(S) <= 500 then
   begin
     if not (FOperatorManager.IsConnected) then
+    begin
+      UdpConn.Disconnect(True);
       UdpConn.Connect(FOperatorManager.MonitorHost, FOperatorManager.MonitorPort);
+    end;
     UdpConn.SendMessage(S, FOperatorManager.MonitorHost + ':' + IntToStr(FOperatorManager.MonitorPort));
   end;
 end;

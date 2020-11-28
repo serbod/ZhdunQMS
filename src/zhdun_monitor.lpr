@@ -7,7 +7,7 @@ uses
   cthreads,
   {$ENDIF}{$ENDIF}
   Interfaces, // this includes the LCL widgetset
-  Forms, lnetvisual, MonitorForm, ZhdunItems, ZhdunTicketManager, ZhdunMonitorUnit
+  Forms, lnetvisual, MonitorForm, ZhdunItems, ZhdunTicketManager
   { you can add units after this };
 
 {$R *.res}

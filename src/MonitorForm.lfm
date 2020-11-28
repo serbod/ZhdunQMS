@@ -25,6 +25,7 @@ object FormMonitor: TFormMonitor
   object UDPListener: TLUDPComponent
     Port = 4444
     OnReceive = UDPListenerReceive
+    OnError = UDPListenerError
     Timeout = 0
     Left = 243
     Top = 211

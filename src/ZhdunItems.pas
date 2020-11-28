@@ -40,6 +40,7 @@ type
     TimeFinish: TDateTime;
 
     OfficeNum: Integer;
+    GroupNum: Integer;
     Deleted: Boolean;
 
     constructor Create();
@@ -58,6 +59,7 @@ type
 
     { Return maximum ticket Num for given AOfficeNum or 0 if no ticket found }
     function GetMaxNum(AOfficeNum: Integer): Integer;
+    function GetMaxNumForGroup(AGroupNum: Integer): Integer;
     { Return ticket with minimum Num for given AOfficeNum, or nil if not found }
     function GetTopTicket(AOfficeNum: Integer): TTicket;
 
@@ -80,7 +82,7 @@ type
     Deleted: Boolean;
 
     TicketPrefix: string;
-    GroupId: Integer;
+    GroupNum: Integer;
 
     // state
     TicketCount: Integer;
@@ -123,8 +125,7 @@ type
   end;
 
   TVisualOffice = object
-    Pos: TPoint;
-    Size: TPoint;
+    Rect: TRect;
     Marked: Boolean;
     OfficeText: string;
     TicketText: string;
@@ -210,6 +211,7 @@ begin
   TimeFinish := 0;
 
   OfficeNum := 0;
+  GroupNum := 0;
   Deleted := False;
 end;
 
@@ -262,6 +264,23 @@ begin
   end;
 end;
 
+function TTicketList.GetMaxNumForGroup(AGroupNum: Integer): Integer;
+var
+  i: Integer;
+  Item: TTicket;
+begin
+  Result := 0;
+  for i := 0 to Count-1 do
+  begin
+    Item := Items[i];
+    if (not Item.Deleted) and (Item.GroupNum = AGroupNum) then
+    begin
+      if Result < Item.Num then
+        Result := Item.Num;
+    end;
+  end;
+end;
+
 function TTicketList.GetTopTicket(AOfficeNum: Integer): TTicket;
 var
   i, MinNum: Integer;
@@ -296,7 +315,7 @@ begin
   Deleted := False;
 
   TicketPrefix := '';
-  GroupId := -1;
+  GroupNum := -1;
 
   TicketCount := 0;
   TicketNum := 0;

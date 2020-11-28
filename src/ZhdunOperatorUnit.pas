@@ -23,8 +23,8 @@ type
     FReqTimestamp: Int64;
     FStateTimestamp: Int64;
   public
-    MonitorHost: string;
-    MonitorPort: Integer;
+    UplinkHost: string;
+    UplinkPort: Integer;
     NeedUpdateInfo: Boolean;
     IsConnected: Boolean;
 
@@ -75,8 +75,8 @@ begin
   ini := TMemIniFile.Create('zhdun_operator.ini');
   try
     sSection := 'Main';
-    MonitorHost := ini.ReadString(sSection, 'MonitorHost', MonitorHost);
-    MonitorPort := ini.ReadInteger(sSection, 'MonitorPort', MonitorPort);
+    UplinkHost := ini.ReadString(sSection, 'UplinkHost', UplinkHost);
+    UplinkPort := ini.ReadInteger(sSection, 'UplinkPort', UplinkPort);
 
     sSection := 'Office';
     Office.Num := ini.ReadInteger(sSection, 'Num', Office.Num);
@@ -102,8 +102,8 @@ begin
   ini := TMemIniFile.Create('zhdun_operator.ini');
   try
     sSection := 'Main';
-    ini.WriteString(sSection, 'MonitorHost', MonitorHost);
-    ini.WriteInteger(sSection, 'MonitorPort', MonitorPort);
+    ini.WriteString(sSection, 'UplinkHost', UplinkHost);
+    ini.WriteInteger(sSection, 'UplinkPort', UplinkPort);
 
     sSection := 'Office';
     ini.WriteInteger(sSection, 'Num', Office.Num);

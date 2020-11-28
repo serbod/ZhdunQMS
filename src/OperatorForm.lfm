@@ -41,7 +41,7 @@ object FormOperator: TFormOperator
     Left = 128
     Height = 15
     Top = 10
-    Width = 64
+    Width = 63
     Caption = 'Total tickets'
     ParentColor = False
   end
@@ -121,6 +121,7 @@ object FormOperator: TFormOperator
   object UDPConn: TLUDPComponent
     Port = 0
     OnReceive = UDPConnReceive
+    OnError = UDPConnError
     Timeout = 0
     Left = 232
     Top = 90

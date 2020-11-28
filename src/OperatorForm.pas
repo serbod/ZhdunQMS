@@ -6,7 +6,8 @@ interface
 
 uses
   Classes, SysUtils, Forms, Controls, Graphics, Dialogs, ExtCtrls, ActnList,
-  Menus, StdCtrls, lNetComponents, ZhdunItems, ZhdunOperatorUnit, lNet, RFUtils;
+  Menus, StdCtrls, lNetComponents, ZhdunItems, ZhdunOperatorUnit, lNet, RFUtils,
+  logger;
 
 type
 
@@ -40,6 +41,7 @@ type
     procedure actPauseExecute(Sender: TObject);
     procedure Timer100msTimer(Sender: TObject);
     procedure Timer1sTimer(Sender: TObject);
+    procedure UDPConnError(const msg: string; aSocket: TLSocket);
     procedure UDPConnReceive(aSocket: TLSocket);
   private
     FOperatorManager: TOperatorManager;
@@ -105,16 +107,26 @@ begin
   FOperatorManager.Tick();
 end;
 
+procedure TFormOperator.UDPConnError(const msg: string; aSocket: TLSocket);
+begin
+  Log.LogError(msg, '');
+end;
+
 procedure TFormOperator.UDPConnReceive(aSocket: TLSocket);
 var
   s: string;
 begin
   aSocket.GetMessage(s);
   if s <> '' then
+  begin
+    Log.LogStatus(s, '');
     FOperatorManager.ProcessCmd(s);
+  end;
 end;
 
 procedure TFormOperator.PostCmdHandler(const S: string);
+var
+  res: Integer;
 begin
   Assert(Length(S) <= 500);
   if Length(S) <= 500 then
@@ -122,9 +134,14 @@ begin
     if not (FOperatorManager.IsConnected) then
     begin
       UdpConn.Disconnect(True);
-      UdpConn.Connect(FOperatorManager.MonitorHost, FOperatorManager.MonitorPort);
+      UdpConn.Connect(FOperatorManager.UplinkHost, FOperatorManager.UplinkPort);
     end;
-    UdpConn.SendMessage(S, FOperatorManager.MonitorHost + ':' + IntToStr(FOperatorManager.MonitorPort));
+    {if not UdpConn.Connected then
+      UdpConn.Connect(FOperatorManager.UplinkHost, FOperatorManager.UplinkPort);  }
+    //res := UdpConn.SendMessage(S, FOperatorManager.UplinkHost + ':' + IntToStr(FOperatorManager.UplinkPort));
+    res := UdpConn.SendMessage(S);
+    if res = 0 then
+      Log.LogError('SendMessage=0', '');
   end;
 end;
 
@@ -135,8 +152,8 @@ begin
   FOperatorManager.OnPostCmd := @PostCmdHandler;
   FOperatorManager.LoadConfig();
 
-  //UdpConn.Port := FOperatorManager.MonitorPort;
-  UdpConn.Connect(FOperatorManager.MonitorHost, FOperatorManager.MonitorPort);
+  //UdpConn.Port := FOperatorManager.UplinkPort;
+  //UdpConn.Connect(FOperatorManager.UplinkHost, FOperatorManager.UplinkPort);
 
   TrayIcon.Icon.Assign(Application.Icon);
 

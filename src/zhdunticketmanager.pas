@@ -27,10 +27,10 @@ type
     VisualOffices: TVisualOfficeArray;
     VisualButtons: TVisualButtonArray;
 
-    VisTicketsArea: TRect;
-    TicketSize: TPoint;
-    TicketBorderSize: Integer;
-    MaxVisTickets: Integer;
+    VisOfficesArea: TRect;
+    VisOfficeSize: TPoint;
+    VisOfficeBorderSize: Integer;
+    MaxVisOffices: Integer;
 
     VisButtonsArea: TRect;
     VisButtonSize: TPoint;
@@ -86,8 +86,8 @@ begin
   FOfficeList := TOfficeList.Create();
 
   VisTicket.Visible := False;
-  MaxVisTickets := 6;
-  TicketBorderSize := 5;
+  MaxVisOffices := 6;
+  VisOfficeBorderSize := 5;
 
   VisButtonBorderSize := 5;
   MaxVisButtons := 3;
@@ -115,10 +115,10 @@ begin
     sSection := 'Monitor';
     if ini.SectionExists(sSection) then
     begin
-      FRoles := FRoles + zrMonitor;
+      FRoles := FRoles + [zrMonitor];
 
-      MaxVisTickets := ini.ReadInteger(sSection, 'MaxVisTickets', MaxVisTickets);
-      TicketBorderSize := ini.ReadInteger(sSection, 'TicketBorderSize', TicketBorderSize);
+      MaxVisOffices := ini.ReadInteger(sSection, 'MaxVisOffices', MaxVisOffices);
+      VisOfficeBorderSize := ini.ReadInteger(sSection, 'OfficeBorderSize', VisOfficeBorderSize);
 
       UplinkPort := ini.ReadInteger(sSection, 'UplinkPort', UplinkPort);
       UplinkHost := ini.ReadString(sSection, 'UplinkHost', UplinkHost);
@@ -127,7 +127,7 @@ begin
     sSection := 'Server';
     if ini.SectionExists(sSection) then
     begin
-      FRoles := FRoles + zrServer;
+      FRoles := FRoles + [zrServer];
       UDPPort := ini.ReadInteger(sSection, 'UDPPort', UDPPort);
 
       // Office list
@@ -144,7 +144,7 @@ begin
         OfficeItem.Comment := ini.ReadString(sSection, 'Comment', OfficeItem.Comment);
         OfficeItem.IconName := ini.ReadString(sSection, 'IconName', OfficeItem.IconName);
         OfficeItem.TicketPrefix := ini.ReadString(sSection, 'TicketPrefix', OfficeItem.TicketPrefix);
-        OfficeItem.GroupId := ini.ReadInteger(sSection, 'GroupId', OfficeItem.GroupId);
+        OfficeItem.GroupNum := ini.ReadInteger(sSection, 'GroupNum', OfficeItem.GroupNum);
 
         OfficeList.Add(OfficeItem);
       end;
@@ -169,8 +169,8 @@ begin
     if zrMonitor in FRoles then
     begin
       sSection := 'Monitor';
-      ini.WriteInteger(sSection, 'MaxVisTickets', MaxVisTickets);
-      ini.WriteInteger(sSection, 'TicketBorderSize', TicketBorderSize);
+      ini.WriteInteger(sSection, 'MaxVisOffices', MaxVisOffices);
+      ini.WriteInteger(sSection, 'OfficeBorderSize', VisOfficeBorderSize);
 
       ini.WriteInteger(sSection, 'UplinkPort', UplinkPort);
       ini.WriteString(sSection, 'UplinkHost', UplinkHost);
@@ -195,7 +195,7 @@ begin
         //Deleted: Boolean;
 
         ini.WriteString(sSection, 'TicketPrefix', OfficeItem.TicketPrefix);
-        ini.WriteInteger(sSection, 'GroupId', OfficeItem.GroupId);
+        ini.WriteInteger(sSection, 'GroupNum', OfficeItem.GroupNum);
       end;
 
       ini.WriteInteger('Server', 'OfficeCount', n);
@@ -217,7 +217,10 @@ begin
   if not Assigned(TmpOffice) then
     Exit;
 
-  MaxNum := TicketList.GetMaxNum(AOfficeNum);
+  if TmpOffice.GroupNum > 0 then
+    MaxNum := TicketList.GetMaxNumForGroup(TmpOffice.GroupNum)
+  else
+    MaxNum := TicketList.GetMaxNum(AOfficeNum);
 
   Inc(MaxNum);
   // replace deleted or create new
@@ -239,6 +242,7 @@ begin
 
   Result.Deleted := False;
   Result.OfficeNum := AOfficeNum;
+  Result.GroupNum := TmpOffice.GroupNum;
   Result.Num := MaxNum;
   Result.IconId := 0;
   Result.Caption := TmpOffice.TicketPrefix + IntToStr(Result.Num);
@@ -272,10 +276,10 @@ var
   NextPos: TPoint;
 begin
   TmpVisualOffices := [];
-  NextPos := VisTicketsArea.TopLeft;
+  NextPos := VisOfficesArea.TopLeft;
 
-  TicketSize.X := VisTicketsArea.Width;
-  TicketSize.Y := (VisTicketsArea.Height div MaxVisTickets);
+  VisOfficeSize.X := VisOfficesArea.Width;
+  VisOfficeSize.Y := (VisOfficesArea.Height div MaxVisOffices);
 
   OfficeIterator.Init(OfficeList);
   while OfficeIterator.Next(TmpOffice) do
@@ -301,7 +305,6 @@ begin
     //TmpVisualOffice.IsValid := True;
     //TmpVisualOffice.Marked := ;
     TmpVisualOffice.OfficeNum := TmpOffice.Num;
-    TmpVisualOffice.TicketNum := TmpTicket.Num;
     TmpVisualOffice.OfficeText := TmpOffice.Caption;
     case TmpOffice.State of
       osPaused: TmpVisualOffice.OfficeText := TmpVisualOffice.OfficeText + '  (Paused)';
@@ -309,16 +312,17 @@ begin
     end;
 
 
-    TmpVisualOffice.Pos := NextPos;
-    TmpVisualOffice.Size := TicketSize;
+    TmpVisualOffice.Rect.TopLeft := NextPos;
+    TmpVisualOffice.Rect.Width := VisOfficeSize.X;
+    TmpVisualOffice.Rect.Height := VisOfficeSize.Y;
 
-    NextPos.Y := NextPos.Y + TicketSize.Y;
+    NextPos.Y := NextPos.Y + VisOfficeSize.Y;
 
     // correct size to show borders
-    TmpVisualOffice.Pos.X := TmpVisualOffice.Pos.X + (TicketBorderSize div 2);
-    TmpVisualOffice.Pos.Y := TmpVisualOffice.Pos.Y + (TicketBorderSize div 2);
-    TmpVisualOffice.Size.X := TmpVisualOffice.Size.X - TicketBorderSize;
-    TmpVisualOffice.Size.Y := TmpVisualOffice.Size.Y - TicketBorderSize;
+    TmpVisualOffice.Rect.Left := TmpVisualOffice.Rect.Left + (VisOfficeBorderSize div 2);
+    TmpVisualOffice.Rect.Top := TmpVisualOffice.Rect.Top + (VisOfficeBorderSize div 2);
+    TmpVisualOffice.Rect.Width := TmpVisualOffice.Rect.Width - VisOfficeBorderSize;
+    TmpVisualOffice.Rect.Height := TmpVisualOffice.Rect.Height - VisOfficeBorderSize;
 
     TmpVisualOffices := Concat(TmpVisualOffices, [TmpVisualOffice]);
   end;
@@ -367,6 +371,12 @@ begin
     TmpVisualButton.Rect.Height := VisButtonSize.Y;
 
     NextPos.Y := NextPos.Y + VisButtonSize.Y;
+
+    // correct size to show borders
+    TmpVisualButton.Rect.Left := TmpVisualButton.Rect.Left + (VisButtonBorderSize div 2);
+    TmpVisualButton.Rect.Top := TmpVisualButton.Rect.Top + (VisButtonBorderSize div 2);
+    TmpVisualButton.Rect.Width := TmpVisualButton.Rect.Width - VisButtonBorderSize;
+    TmpVisualButton.Rect.Height := TmpVisualButton.Rect.Height - VisButtonBorderSize;
 
     TmpVisualButtons := Concat(TmpVisualButtons, [TmpVisualButton]);
   end;

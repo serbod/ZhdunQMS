@@ -15,7 +15,7 @@ uses
 begin
   {$if declared(useHeapTrace)}
   globalSkipIfNoLeaks := true; // supported as of debugger version 3.2.0
-  setHeapTraceOutput('trace.log'); // supported as of debugger version 3.2.0
+  setHeapTraceOutput('operator_trace.log'); // supported as of debugger version 3.2.0
   {$endIf}
   RequireDerivedFormResource := True;
   Application.Scaled := True;

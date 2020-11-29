@@ -274,7 +274,9 @@ begin
     Office := OfficeList.GetByNum(AOfficeNum);
     if Assigned(Office) then
     begin
-      s := 'office: ' + Office.Caption + ', next ticket number: ' + Result.Caption;
+      //s := 'office: ' + Office.Caption + ', next ticket number: ' + Result.Caption;
+      //s := Format('Билет номер: %s, пройдите в кабинет номер: %s', [Result.Caption, Office.Caption]);
+      s := Format('Билет номер: %s, пройдите в кабинет номер: %d', [Result.Caption, Office.Num]);
       if Assigned(OnSpeechText) then
         OnSpeechText(s);
     end;

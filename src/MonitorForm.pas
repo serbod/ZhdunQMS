@@ -543,7 +543,7 @@ var
 begin
   FSpVoice := CreateOleObject('SAPI.SpVoice');
 
-  {$ifdef WIN32}
+  //{$ifdef WIN32}
   SpVoicesList := FSpVoice.GetVoices();
   for i := 0 to SpVoicesList.Count-1 do
   begin
@@ -555,7 +555,7 @@ begin
       //FSpVoice.SetVoice(SpVoiceToken);
     end;
   end;
-  {$endif}
+  //{$endif}
 end;
 
 procedure TFormMonitor.OnSendCmdHandler(const ACmdText, AHostPort: string);

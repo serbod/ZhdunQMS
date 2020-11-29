@@ -5,8 +5,9 @@ unit MonitorForm;
 interface
 
 uses
-  {$ifdef WINDOWS}windows,{$endif}
-  Classes, SysUtils, Forms, Controls, Graphics, Dialogs, ExtCtrls,
+  {$ifdef WINDOWS}windows, comobj,{$endif}
+  Classes, SysUtils, Forms, Controls, Graphics, Dialogs, ExtCtrls, Menus,
+  Variants,
   lNetComponents, ZhdunItems, ZhdunTicketManager, FPCanvas, lNet, RFUtils,
   logger;
 
@@ -15,11 +16,14 @@ type
   { TFormMonitor }
 
   TFormMonitor = class(TForm)
+    miListVoices: TMenuItem;
+    pmMain: TPopupMenu;
     UDPUplink: TLUDPComponent;
     UDPListener: TLUDPComponent;
     PaintBox: TPaintBox;
     Timer1000ms: TTimer;
     procedure FormResize(Sender: TObject);
+    procedure miListVoicesClick(Sender: TObject);
     procedure UDPListenerError(const msg: string; aSocket: TLSocket);
     procedure UDPListenerReceive(aSocket: TLSocket);
     procedure PaintBoxMouseUp(Sender: TObject; Button: TMouseButton;
@@ -37,6 +41,7 @@ type
     FHeaderText: string;
 
     FNeedRestartListener: Boolean;
+    FSpVoice: Variant;
 
     procedure AfterResize();
 
@@ -49,8 +54,12 @@ type
     procedure ProcessClick(X, Y: Integer);
     procedure StartListener();
 
+    procedure PrepareVoice();
+
     procedure OnSendCmdHandler(const ACmdText, AHostPort: string);
     procedure OnUplinkSendCmdHandler(const ACmdText, AHostPort: string);
+
+    procedure OnSpeechText(const S: string);
   public
     procedure AfterConstruction; override;
     procedure BeforeDestruction; override;
@@ -137,6 +146,32 @@ end;
 procedure TFormMonitor.FormResize(Sender: TObject);
 begin
   AfterResize();
+end;
+
+procedure TFormMonitor.miListVoicesClick(Sender: TObject);
+var
+  SpVoice, SpVoicesList, SpVoiceToken: Variant;
+  //VoiceString: WideString; // WideString must be used to assign variable for speech to function, can be Global.
+  i: Integer;
+  sl: TStringList;
+begin
+  SpVoice := CreateOleObject('SAPI.SpVoice'); // Can be assigned in form.create
+  //VoiceString := S;              // variable assignment
+  //SpVoice.Speak(VoiceString, 0);
+  sl := TStringList.Create();
+  try
+    SpVoicesList := SpVoice.GetVoices();
+    for i := 0 to SpVoicesList.Count-1 do
+    begin
+      SpVoiceToken := SpVoicesList.Item(i);
+      sl.Add(SpVoiceToken.GetDescription());
+    end;
+
+    ShowMessage(sl.Text);
+
+  finally
+    sl.Free();
+  end;
 end;
 
 procedure TFormMonitor.UDPListenerError(const msg: string; aSocket: TLSocket);
@@ -500,6 +535,29 @@ begin
   UDPListener.Listen(FTicketManager.UDPPort);
 end;
 
+procedure TFormMonitor.PrepareVoice();
+var
+  SpVoicesList, SpVoiceToken: Variant;
+  s: string;
+  i: Integer;
+begin
+  FSpVoice := CreateOleObject('SAPI.SpVoice');
+
+  {$ifdef WIN32}
+  SpVoicesList := FSpVoice.GetVoices();
+  for i := 0 to SpVoicesList.Count-1 do
+  begin
+    //SpVoiceToken := SpVoicesList.Item(i);
+    s := SpVoicesList.Item(i).GetDescription();
+    if Pos('Russian', s) > 0 then
+    begin
+      FSpVoice.Voice := SpVoicesList.Item(i);
+      //FSpVoice.SetVoice(SpVoiceToken);
+    end;
+  end;
+  {$endif}
+end;
+
 procedure TFormMonitor.OnSendCmdHandler(const ACmdText, AHostPort: string);
 begin
   if (ACmdText <> '') and (AHostPort <> '') then
@@ -523,6 +581,20 @@ begin
   end;
 end;
 
+procedure TFormMonitor.OnSpeechText(const S: string);
+const
+  SVSFDefault = 0;
+  SVSFlagsAsync = 1;
+  SVSFPurgeBeforeSpeak = 2;
+  SVSFIsFilename = 4;
+var
+  VoiceString: WideString; // WideString must be used to assign variable for speech to function, can be Global.
+begin
+  if VarIsEmpty(FSpVoice) then Exit;
+  VoiceString := S;              // variable assignment
+  FSpVoice.Speak(VoiceString, SVSFlagsAsync);
+end;
+
 procedure TFormMonitor.AfterConstruction;
 begin
   inherited AfterConstruction;
@@ -537,6 +609,7 @@ begin
 
   FTicketManager.UDPPort := 4444;
   FTicketManager.OnSendCmd := @OnSendCmdHandler;
+  FTicketManager.OnSpeechText := @OnSpeechText;
 
   FTicketManager.LoadConfig();
 
@@ -555,7 +628,7 @@ begin
   else
     FBGFileName := '';
 
-
+  PrepareVoice();
   StartListener();
 
   TestTickets();

@@ -22,6 +22,7 @@ type
 
     FOnSendCmd: TSendCmdEvent;
     FOnUplinkSendCmd: TSendCmdEvent;
+    FOnSpeechText: TGetStrProc;
 
   public
     VisualOffices: TVisualOfficeArray;
@@ -72,6 +73,7 @@ type
 
     property OnSendCmd: TSendCmdEvent read FOnSendCmd write FOnSendCmd;
     property OnUplinkSendCmd: TSendCmdEvent read FOnUplinkSendCmd write FOnUplinkSendCmd;
+    property OnSpeechText: TGetStrProc read FOnSpeechText write FOnSpeechText;
   end;
 
 
@@ -252,6 +254,8 @@ end;
 function TTicketManager.NextTicket(AOfficeNum: Integer): TTicket;
 var
   Ticket: TTicket;
+  Office: TOffice;
+  s: string;
 begin
   Result := nil;
   Assert(AOfficeNum >= 0);
@@ -264,6 +268,17 @@ begin
   //TicketList.Delete(Ticket.Id);
 
   Result := TicketList.GetTopTicket(AOfficeNum);
+
+  if Assigned(Result) then
+  begin
+    Office := OfficeList.GetByNum(AOfficeNum);
+    if Assigned(Office) then
+    begin
+      s := 'office: ' + Office.Caption + ', next ticket number: ' + Result.Caption;
+      if Assigned(OnSpeechText) then
+        OnSpeechText(s);
+    end;
+  end;
 end;
 
 procedure TTicketManager.UpdateVisualOffices();

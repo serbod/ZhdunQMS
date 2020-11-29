@@ -14,6 +14,7 @@ object FormMonitor: TFormMonitor
     Top = 0
     Width = 526
     Align = alClient
+    PopupMenu = pmMain
     OnMouseUp = PaintBoxMouseUp
     OnPaint = PaintBoxPaint
   end
@@ -37,5 +38,13 @@ object FormMonitor: TFormMonitor
     Timeout = 0
     Left = 243
     Top = 272
+  end
+  object pmMain: TPopupMenu
+    Left = 359
+    Top = 162
+    object miListVoices: TMenuItem
+      Caption = 'List voices'
+      OnClick = miListVoicesClick
+    end
   end
 end

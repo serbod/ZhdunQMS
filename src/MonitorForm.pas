@@ -7,7 +7,7 @@ interface
 uses
   {$ifdef WINDOWS}windows, comobj,{$endif}
   Classes, SysUtils, Forms, Controls, Graphics, Dialogs, ExtCtrls, Menus,
-  Variants,
+  Variants, LazUTF8,
   lNetComponents, ZhdunItems, ZhdunTicketManager, FPCanvas, lNet, RFUtils,
   logger;
 
@@ -35,6 +35,7 @@ type
   private
     FTicketManager: TTicketManager;
 
+    FConfigFileName: string;
     FBGFileName: string;
     FBGImage: TImage;
 
@@ -104,14 +105,17 @@ begin
     DrawOffice(c, FTicketManager.VisualOffices[i]);
   end;
 
-  for i := Low(FTicketManager.VisualButtons) to High(FTicketManager.VisualButtons) do
+  if zrKiosk in FTicketManager.Roles then
   begin
-    DrawButton(c, FTicketManager.VisualButtons[i]);
-  end;
+    for i := Low(FTicketManager.VisualButtons) to High(FTicketManager.VisualButtons) do
+    begin
+      DrawButton(c, FTicketManager.VisualButtons[i]);
+    end;
 
-  if FTicketManager.VisTicket.Visible then
-  begin
-    DrawTicket(c, FTicketManager.VisTicket);
+    if FTicketManager.VisTicket.Visible then
+    begin
+      DrawTicket(c, FTicketManager.VisTicket);
+    end;
   end;
 end;
 
@@ -123,23 +127,29 @@ begin
     FNeedRestartListener := False;
     StartListener();
   end;
+
+  FTicketManager.Tick();
 end;
 
 procedure TFormMonitor.UDPUplinkError(const msg: string; aSocket: TLSocket);
 begin
-  Log.LogError(msg, 'Uplink');
+  _LogError('Uplink: ' + WinCPToUTF8(msg));
 end;
 
 procedure TFormMonitor.UDPUplinkReceive(aSocket: TLSocket);
 var
-  s, sHostPort: string;
+  s, ss, sHostPort: string;
 begin
-  aSocket.GetMessage(s);
+  aSocket.GetMessage(ss);
   sHostPort := aSocket.PeerAddress + ':' + IntToStr(aSocket.PeerPort);
-  if s <> '' then
+  if ss <> '' then
   begin
-    Log.LogStatus(s, 'Uplink');
-    FTicketManager.ProcessCmd(s, sHostPort);
+    _LogDebug('Uplink: ' + ss);
+    while ss <> '' do
+    begin
+      s := ExtractFirstWord(ss, sLineBreak);
+      FTicketManager.ProcessCmd(s, sHostPort);
+    end;
   end;
 end;
 
@@ -176,7 +186,7 @@ end;
 
 procedure TFormMonitor.UDPListenerError(const msg: string; aSocket: TLSocket);
 begin
-  Log.LogError(msg, 'Listener');
+  _LogError('Listener: ' + WinCPToUTF8(msg));
   FNeedRestartListener := True;
 end;
 
@@ -188,7 +198,7 @@ begin
   sHostPort := aSocket.PeerAddress + ':' + IntToStr(aSocket.PeerPort);
   if s <> '' then
   begin
-    Log.LogStatus(s, 'Listener');
+    _LogDebug('Listener: ' + s);
     FTicketManager.ProcessCmd(s, sHostPort);
   end;
 end;
@@ -532,7 +542,8 @@ end;
 
 procedure TFormMonitor.StartListener();
 begin
-  UDPListener.Listen(FTicketManager.UDPPort);
+  if (zrServer in FTicketManager.Roles) then
+    UDPListener.Listen(FTicketManager.UDPPort);
 end;
 
 procedure TFormMonitor.PrepareVoice();
@@ -572,7 +583,7 @@ begin
   Assert(Length(ACmdText) <= 500);
   if Length(ACmdText) <= 500 then
   begin
-    if not (FTicketManager.UplinkConnected) then
+    if not (FTicketManager.IsUplinkConnected) then
     begin
       UDPUplink.Disconnect(True);
       UDPUplink.Connect(FTicketManager.UplinkHost, FTicketManager.UplinkPort);
@@ -596,8 +607,22 @@ begin
 end;
 
 procedure TFormMonitor.AfterConstruction;
+var
+  s: string;
 begin
   inherited AfterConstruction;
+
+  FConfigFileName := 'zhdun.ini';
+
+  // parse options
+  if ParamCount >= 1 then
+  begin
+    FConfigFileName := ParamStr(1);
+    // name without extension
+    s := ExtractFileName(FConfigFileName);
+    s := Copy(s, 1, Length(s) - Length(ExtractFileExt(s)));
+    DLogger.LogFileName := s;
+  end;
 
   FTicketManager := TTicketManager.Create;
 
@@ -609,9 +634,10 @@ begin
 
   FTicketManager.UDPPort := 4444;
   FTicketManager.OnSendCmd := @OnSendCmdHandler;
+  FTicketManager.OnUplinkSendCmd := @OnUplinkSendCmdHandler;
   FTicketManager.OnSpeechText := @OnSpeechText;
 
-  FTicketManager.LoadConfig();
+  FTicketManager.LoadConfig(FConfigFileName);
 
   FHeaderText := csHeaderText;
   if FileExists('bg.png') then

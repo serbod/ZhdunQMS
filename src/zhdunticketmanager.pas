@@ -9,6 +9,8 @@ uses
 
 const
   ciTicketShowTimeout = 10; // seconds
+  LINK_TIMEOUT = 30; // seconds
+  BTN_NEXT_TIMEOUT = 2; // seconds
 
 type
   { TTicketManager }
@@ -24,7 +26,13 @@ type
     FOnUplinkSendCmd: TSendCmdEvent;
     FOnSpeechText: TGetStrProc;
 
+  protected
+    // == for Monitor role
+    FReqTimestamp: Int64;
+    FStateTimestamp: Int64;
+
   public
+    // == for Monitor role
     VisualOffices: TVisualOfficeArray;
     VisualButtons: TVisualButtonArray;
 
@@ -40,31 +48,40 @@ type
 
     VisTicket: TVisualTicket;
 
-    UDPPort: Integer;
+    NeedUpdateInfo: Boolean;
+    VoiceEnabled: Boolean;
 
     UplinkHost: string;
     UplinkPort: Integer;
-    UplinkConnected: Boolean;
+    IsUplinkConnected: Boolean;
+
+    // == for Server role
+    UDPPort: Integer;
 
     procedure AfterConstruction; override;
     procedure BeforeDestruction; override;
 
-    procedure LoadConfig();
-    procedure SaveConfig();
+    procedure LoadConfig(AFileName: string);
+    procedure SaveConfig(AFileName: string);
 
     { Create new ticket for specified office }
     function CreateTicket(AOfficeNum: Integer): TTicket;
     { Discard current ticket and set next ticket as current for specified office }
     function NextTicket(AOfficeNum: Integer): TTicket;
 
+    procedure Tick();
+
     procedure UpdateVisualOffices();
     procedure UpdateVisualButtons();
 
     procedure UpdateOfficesStates();
 
-    procedure PostCmd(AOffice: TOffice; ACmdText: string);
+    procedure PostCmdToOffice(AOffice: TOffice; ACmdText: string);
+    procedure PostCmd(ACmdText, AHostPort: string);
+    procedure PostUplinkCmd(ACmdText: string);
 
     procedure ProcessCmd(ACmdText, AHostPort: string);
+    //procedure ProcessUplinkCmd(ACmdText, AHostPort: string);
 
     property TicketList: TTicketList read FTicketList;
     property OfficeList: TOfficeList read FOfficeList;
@@ -105,14 +122,14 @@ begin
   inherited BeforeDestruction;
 end;
 
-procedure TTicketManager.LoadConfig();
+procedure TTicketManager.LoadConfig(AFileName: string);
 var
   ini: TMemIniFile;
   sSection: string;
   i, n: Integer;
   OfficeItem: TOffice;
 begin
-  ini := TMemIniFile.Create('zhdun.ini');
+  ini := TMemIniFile.Create(AFileName);
   try
     sSection := 'Monitor';
     if ini.SectionExists(sSection) then
@@ -124,6 +141,17 @@ begin
 
       UplinkPort := ini.ReadInteger(sSection, 'UplinkPort', UplinkPort);
       UplinkHost := ini.ReadString(sSection, 'UplinkHost', UplinkHost);
+
+      VoiceEnabled := ini.ReadBool(sSection, 'VoiceEnabled', False);
+    end;
+
+    sSection := 'Kiosk';
+    if ini.SectionExists(sSection) then
+    begin
+      FRoles := FRoles + [zrKiosk];
+
+      MaxVisButtons := ini.ReadInteger(sSection, 'MaxVisButtons', MaxVisButtons);
+      VisButtonBorderSize := ini.ReadInteger(sSection, 'VisButtonBorderSize', VisButtonBorderSize);
     end;
 
     sSection := 'Server';
@@ -158,7 +186,7 @@ begin
   end;
 end;
 
-procedure TTicketManager.SaveConfig();
+procedure TTicketManager.SaveConfig(AFileName: string);
 var
   ini: TMemIniFile;
   sSection: string;
@@ -166,13 +194,14 @@ var
   OfficeIterator: TOfficeListIterator;
   OfficeItem: TOffice;
 begin
-  ini := TMemIniFile.Create('zhdun.ini');
+  ini := TMemIniFile.Create(AFileName);
   try
     if zrMonitor in FRoles then
     begin
       sSection := 'Monitor';
       ini.WriteInteger(sSection, 'MaxVisOffices', MaxVisOffices);
       ini.WriteInteger(sSection, 'OfficeBorderSize', VisOfficeBorderSize);
+      ini.WriteBool(sSection, 'VoiceEnabled', VoiceEnabled);
 
       ini.WriteInteger(sSection, 'UplinkPort', UplinkPort);
       ini.WriteString(sSection, 'UplinkHost', UplinkHost);
@@ -277,8 +306,30 @@ begin
       //s := 'office: ' + Office.Caption + ', next ticket number: ' + Result.Caption;
       //s := Format('Билет номер: %s, пройдите в кабинет номер: %s', [Result.Caption, Office.Caption]);
       s := Format('Билет номер: %s, пройдите в кабинет номер: %d', [Result.Caption, Office.Num]);
-      if Assigned(OnSpeechText) then
+      if VoiceEnabled and Assigned(OnSpeechText) then
         OnSpeechText(s);
+    end;
+  end;
+end;
+
+procedure TTicketManager.Tick();
+begin
+  if (zrMonitor in Roles) and (not (zrServer in Roles)) then
+  begin
+    if NeedUpdateInfo then
+    begin
+      PostUplinkCmd('INFO_REQ');
+    end
+    else
+    begin
+      PostUplinkCmd('STATE_REQ');
+    end;
+
+    FReqTimestamp := GetTickCount64();
+    if (not NeedUpdateInfo) and (SecondsBetweenTicks(FReqTimestamp, FStateTimestamp) > LINK_TIMEOUT) then
+    begin
+      NeedUpdateInfo := True;
+      IsUplinkConnected := False;
     end;
   end;
 end;
@@ -433,16 +484,17 @@ begin
     else
       TmpOffice.TicketNum := 0;
 
+    {
     // STATE <tickets_count> [ticket_num]
     s := Format('STATE %d', [TmpOffice.TicketCount]);
     if TmpOffice.TicketCount > 0 then
       s := s + ' ' + IntToStr(TmpOffice.TicketNum);
 
-    PostCmd(TmpOffice, s);
+    PostCmdToOffice(TmpOffice, s);  }
   end;
 end;
 
-procedure TTicketManager.PostCmd(AOffice: TOffice; ACmdText: string);
+procedure TTicketManager.PostCmdToOffice(AOffice: TOffice; ACmdText: string);
 var
   s: string;
 begin
@@ -450,11 +502,22 @@ begin
   if Assigned(OnSendCmd) then OnSendCmd(s, AOffice.HostPort);
 end;
 
+procedure TTicketManager.PostCmd(ACmdText, AHostPort: string);
+begin
+  if Assigned(OnSendCmd) then OnSendCmd(ACmdText, AHostPort);
+end;
+
+procedure TTicketManager.PostUplinkCmd(ACmdText: string);
+begin
+  if Assigned(OnUplinkSendCmd) then OnUplinkSendCmd(ACmdText, '');
+end;
+
 procedure TTicketManager.ProcessCmd(ACmdText, AHostPort: string);
 var
-  s, ss, sCmd: string;
+  s, ss, sCmd, sOut: string;
   iNum: Integer;
   TmpOffice: TOffice;
+  OfficeIterator: TOfficeListIterator;
 begin
   ss := ACmdText;
   sCmd := ExtractFirstWord(ss);
@@ -467,6 +530,13 @@ begin
     if iNum <> -1 then
     begin
       TmpOffice := OfficeList.GetByNum(iNum);
+      if not Assigned(TmpOffice) and (zrMonitor in Roles) then
+      begin
+        TmpOffice := TOffice.Create();
+        TmpOffice.Num := iNum;
+        OfficeList.Add(TmpOffice);
+      end;
+
       if Assigned(TmpOffice) then
       begin
         if AHostPort <> '' then
@@ -474,21 +544,21 @@ begin
 
         sCmd := ExtractFirstWord(ss);
 
-        // CREATE_TICKET
+        // OFFICE 1: CREATE_TICKET
         if sCmd = 'CREATE_TICKET' then
         begin
           CreateTicket(TmpOffice.Num);
           UpdateVisualOffices();
         end
         else
-        // NEXT_TICKET
+        // OFFICE 1: NEXT_TICKET
         if sCmd = 'NEXT_TICKET' then
         begin
           NextTicket(TmpOffice.Num);
           UpdateVisualOffices();
         end
         else
-        // INFO_REQ
+        // OFFICE 1: INFO_REQ
         if sCmd = 'INFO_REQ' then
         begin
           TmpOffice.State := osIdle;
@@ -497,22 +567,94 @@ begin
           s := Format('INFO %s %s %s %s', [TmpOffice.Caption, TmpOffice.TicketPrefix,
             TmpOffice.IconName, TmpOffice.Comment]);
 
-          PostCmd(TmpOffice, s);
+          PostCmdToOffice(TmpOffice, s);
         end
         else
-        // STATE_REQ
+        // OFFICE 1: STATE_REQ
         if sCmd = 'STATE_REQ' then
         begin
           UpdateOfficesStates();
-          {
-          // STATE <Caption> <TicketPrefix> <IconName> <Comment>
-          s := Format('INFO %s %s %s %s', [TmpOffice.Caption, TmpOffice.TicketPrefix,
-            TmpOffice.IconName, TmpOffice.Comment]);
+          // STATE <tickets_count> [ticket_num]
+          s := Format('STATE %d', [TmpOffice.TicketCount]);
+          if TmpOffice.TicketCount > 0 then
+            s := s + ' ' + IntToStr(TmpOffice.TicketNum);
 
-          PostCmd(TmpOffice, s);  }
+          PostCmdToOffice(TmpOffice, s);
+        end
+        else
+        // === commands from uplink
+        // OFFICE 1: STATE <tickets_count> [ticket_num]
+        if sCmd = 'STATE' then
+        begin
+          { TODO : State field }
+          s := ExtractFirstWord(ss); // tickets_count
+          TmpOffice.TicketCount := StrToIntDef(s, 0);
+
+          s := ExtractFirstWord(ss); // ticket_num
+          TmpOffice.TicketNum := StrToIntDef(s, 0);
+
+          FStateTimestamp := GetTickCount64();
+          IsUplinkConnected := True;
+          UpdateOfficesStates();
+        end
+        else
+        // OFFICE 1: INFO <Caption> <TicketPrefix> <IconName> <Comment>
+        if sCmd = 'INFO' then
+        begin
+          s := ExtractFirstWord(ss); // Caption
+          TmpOffice.Caption := s;
+
+          s := ExtractFirstWord(ss); // TicketPrefix
+          TmpOffice.TicketPrefix := s;
+
+          s := ExtractFirstWord(ss); // IconName
+          TmpOffice.IconName := s;
+
+          TmpOffice.Comment := Trim(ss); // Comment
+
+          NeedUpdateInfo := False;
+          IsUplinkConnected := True;
+          PostUplinkCmd('STATE_REQ');
+
+          if zrMonitor in Roles then
+            TmpOffice.State := osIdle;
         end;
       end;
     end;
+  end
+  else
+  // INFO_REQ
+  if sCmd = 'INFO_REQ' then
+  begin
+    // for all offices
+    sOut := '';
+    OfficeIterator.Init(OfficeList);
+    while OfficeIterator.Next(TmpOffice) do
+    begin
+      // OFFICE 1: INFO <Caption> <TicketPrefix> <IconName> <Comment>
+      s := Format('OFFICE %d: INFO %s %s %s %s',
+        [TmpOffice.Num, TmpOffice.Caption, TmpOffice.TicketPrefix,
+        TmpOffice.IconName, TmpOffice.Comment]);
+      sOut := sOut + s + sLineBreak;
+    end;
+    PostCmd(sOut, AHostPort);
+  end
+  else
+  if sCmd = 'STATE_REQ' then
+  begin
+    UpdateOfficesStates();
+    // for all offices
+    sOut := '';
+    OfficeIterator.Init(OfficeList);
+    while OfficeIterator.Next(TmpOffice) do
+    begin
+      // OFFICE 1: STATE <tickets_count> [ticket_num]
+      s := Format('OFFICE %d: STATE %d', [TmpOffice.Num, TmpOffice.TicketCount]);
+      if TmpOffice.TicketCount > 0 then
+        s := s + ' ' + IntToStr(TmpOffice.TicketNum);
+      sOut := sOut + s + sLineBreak;
+    end;
+    PostCmd(sOut, AHostPort);
   end;
 
 

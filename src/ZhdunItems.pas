@@ -11,7 +11,7 @@ uses
 type
   TSendCmdEvent = procedure(const ACmdText, AHostPort: string) of object;
 
-  TZhdunRole = (zrNone, zrServer, zrMonitor, zrOperator, zrAdmin);
+  TZhdunRole = (zrNone, zrServer, zrMonitor, zrOperator, zrAdmin, zrKiosk);
   TZhdunRoles = set of TZhdunRole;
 
   { IZOffice }

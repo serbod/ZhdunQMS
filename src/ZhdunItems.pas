@@ -93,6 +93,8 @@ type
 
     // local
     ButtonPressTimestamp: Int64;
+    AnnounceTimestamp: Int64;
+    IsMarked: Boolean;
 
     constructor Create();
     function IsVisible(): Boolean;
@@ -130,6 +132,7 @@ type
     OfficeText: string;
     TicketText: string;
     IsValid: Boolean;
+    State: TOfficeState;
 
     TicketNum: Integer;
     OfficeNum: Integer;
@@ -323,11 +326,13 @@ begin
   HostPort := '';
 
   ButtonPressTimestamp := 0;
+  AnnounceTimestamp := 0;
+  IsMarked := False;
 end;
 
 function TOffice.IsVisible(): Boolean;
 begin
-  Result := State in [osBusy, osIdle, osPaused];
+  Result := State in [osBusy, osIdle, osPaused, osLost];
 end;
 
 { TOfficeList }

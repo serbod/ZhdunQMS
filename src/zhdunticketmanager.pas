@@ -47,6 +47,7 @@ type
     MaxVisButtons: Integer;
 
     VisTicket: TVisualTicket;
+    FooterText: string;
 
     NeedUpdateInfo: Boolean;
     VoiceEnabled: Boolean;
@@ -68,6 +69,8 @@ type
     function CreateTicket(AOfficeNum: Integer): TTicket;
     { Discard current ticket and set next ticket as current for specified office }
     function NextTicket(AOfficeNum: Integer): TTicket;
+    { Audio and visual notification }
+    procedure AnnounceTicket(AOfficeNum: Integer);
 
     procedure Tick();
 
@@ -298,17 +301,41 @@ begin
 
   Result := TicketList.GetTopTicket(AOfficeNum);
 
+  Office := OfficeList.GetByNum(AOfficeNum);
+  if Assigned(Office) then
+  begin
+    if Assigned(Result) then
+      Office.TicketNum := Result.Num
+    else
+      Office.TicketNum := 0;
+  end;
+
   if Assigned(Result) then
   begin
-    Office := OfficeList.GetByNum(AOfficeNum);
-    if Assigned(Office) then
-    begin
-      //s := 'office: ' + Office.Caption + ', next ticket number: ' + Result.Caption;
-      //s := Format('Билет номер: %s, пройдите в кабинет номер: %s', [Result.Caption, Office.Caption]);
-      s := Format('Билет номер: %s, пройдите в кабинет номер: %d', [Result.Caption, Office.Num]);
-      if VoiceEnabled and Assigned(OnSpeechText) then
-        OnSpeechText(s);
-    end;
+    AnnounceTicket(AOfficeNum);
+  end;
+end;
+
+procedure TTicketManager.AnnounceTicket(AOfficeNum: Integer);
+var
+  Office: TOffice;
+  s, ss: string;
+begin
+  Office := OfficeList.GetByNum(AOfficeNum);
+  if Assigned(Office) then
+  begin
+    Office.AnnounceTimestamp := GetTickCount64();
+    Office.IsMarked := True;
+
+    s := Office.TicketPrefix + IntToStr(Office.TicketNum);
+
+    //s := 'office: ' + Office.Caption + ', next ticket number: ' + Result.Caption;
+    //s := Format('Билет номер: %s, пройдите в кабинет номер: %s', [Result.Caption, Office.Caption]);
+    ss := Format('Билет номер: %s, пройдите в кабинет номер: %d', [s, Office.Num]);
+    if VoiceEnabled and Assigned(OnSpeechText) then
+      OnSpeechText(ss);
+
+    FooterText := ss;
   end;
 end;
 
@@ -340,8 +367,9 @@ var
   TmpVisualOffice: TVisualOffice;
   OfficeIterator: TOfficeListIterator;
   TmpOffice: TOffice;
-  TmpTicket: TTicket;
+  //TmpTicket: TTicket;
   NextPos: TPoint;
+  TimeDiff: Int64;
 begin
   TmpVisualOffices := [];
   NextPos := VisOfficesArea.TopLeft;
@@ -355,11 +383,14 @@ begin
     if not TmpOffice.IsVisible() then
       Continue;
 
-    TmpTicket := TicketList.GetTopTicket(TmpOffice.Num);
-    if Assigned(TmpTicket) then
+    TmpVisualOffice.Marked := False;
+    TmpVisualOffice.State := TmpOffice.State;
+    //TmpTicket := TicketList.GetTopTicket(TmpOffice.Num);
+    if TmpOffice.TicketNum > 0 then
     begin
-      TmpVisualOffice.TicketNum := TmpTicket.Num;
-      TmpVisualOffice.TicketText := TmpTicket.Caption;
+      TmpVisualOffice.TicketNum := TmpOffice.TicketNum;
+      //TmpVisualOffice.TicketText := TmpTicket.Caption;
+      TmpVisualOffice.TicketText := TmpOffice.TicketPrefix + IntToStr(TmpOffice.TicketNum);
       if TmpOffice.TicketCount > 1 then
         TmpVisualOffice.TicketText := TmpVisualOffice.TicketText + Format(
           '  (+%d)', [TmpOffice.TicketCount]);
@@ -371,7 +402,15 @@ begin
     end;
 
     //TmpVisualOffice.IsValid := True;
-    //TmpVisualOffice.Marked := ;
+    if TmpOffice.TicketNum <> 0 then
+      TimeDiff := TickDiff(GetTickCount, TmpOffice.AnnounceTimestamp)
+    else
+      TimeDiff := 0;
+
+    if (TimeDiff > 0) and (TimeDiff < (ciTicketShowTimeout * 1000)) then
+    begin
+      TmpVisualOffice.Marked := ((TimeDiff mod 500) > 250);
+    end;
     TmpVisualOffice.OfficeNum := TmpOffice.Num;
     TmpVisualOffice.OfficeText := TmpOffice.Caption;
     case TmpOffice.State of
@@ -466,23 +505,26 @@ begin
     if TmpOffice.State in [osUndef, osOff] then
       Continue;
 
-    // update ticket count
-    TmpTicketCount := 0;
-    for i := 0 to TicketList.Count-1 do
+    if zrServer in Roles then
     begin
-      TmpTicket := TicketList.Items[i];
-      if (not TmpTicket.Deleted) and (TmpTicket.OfficeNum = TmpOffice.Num) then
+      // update ticket count
+      TmpTicketCount := 0;
+      for i := 0 to TicketList.Count-1 do
       begin
-        Inc(TmpTicketCount);
+        TmpTicket := TicketList.Items[i];
+        if (not TmpTicket.Deleted) and (TmpTicket.OfficeNum = TmpOffice.Num) then
+        begin
+          Inc(TmpTicketCount);
+        end;
       end;
-    end;
-    TmpOffice.TicketCount := TmpTicketCount;
+      TmpOffice.TicketCount := TmpTicketCount;
 
-    TmpTicket := TicketList.GetTopTicket(TmpOffice.Num);
-    if Assigned(TmpTicket) then
-      TmpOffice.TicketNum := TmpTicket.Num
-    else
-      TmpOffice.TicketNum := 0;
+      TmpTicket := TicketList.GetTopTicket(TmpOffice.Num);
+      if Assigned(TmpTicket) then
+        TmpOffice.TicketNum := TmpTicket.Num
+      else
+        TmpOffice.TicketNum := 0;
+    end;
 
     {
     // STATE <tickets_count> [ticket_num]
@@ -515,9 +557,10 @@ end;
 procedure TTicketManager.ProcessCmd(ACmdText, AHostPort: string);
 var
   s, ss, sCmd, sOut: string;
-  iNum: Integer;
+  iNum, iStateNum, iTicketNum: Integer;
   TmpOffice: TOffice;
   OfficeIterator: TOfficeListIterator;
+  IsNeedAnnounce: Boolean;
 begin
   ss := ACmdText;
   sCmd := ExtractFirstWord(ss);
@@ -574,8 +617,8 @@ begin
         if sCmd = 'STATE_REQ' then
         begin
           UpdateOfficesStates();
-          // STATE <tickets_count> [ticket_num]
-          s := Format('STATE %d', [TmpOffice.TicketCount]);
+          // STATE <state_num> <tickets_count> [ticket_num]
+          s := Format('STATE %d %d', [Ord(TmpOffice.State), TmpOffice.TicketCount]);
           if TmpOffice.TicketCount > 0 then
             s := s + ' ' + IntToStr(TmpOffice.TicketNum);
 
@@ -583,19 +626,27 @@ begin
         end
         else
         // === commands from uplink
-        // OFFICE 1: STATE <tickets_count> [ticket_num]
+        // OFFICE 1: STATE <state_num> <tickets_count> [ticket_num]
         if sCmd = 'STATE' then
         begin
-          { TODO : State field }
+          s := ExtractFirstWord(ss); // state_num
+          iStateNum := StrToIntDef(s, 0);
+          if (iStateNum >= Ord(Low(TOfficeState))) and (iStateNum <= Ord(High(TOfficeState))) then
+            TmpOffice.State := TOfficeState(iStateNum);
+
           s := ExtractFirstWord(ss); // tickets_count
           TmpOffice.TicketCount := StrToIntDef(s, 0);
 
           s := ExtractFirstWord(ss); // ticket_num
-          TmpOffice.TicketNum := StrToIntDef(s, 0);
+          iTicketNum := StrToIntDef(s, 0);
+          IsNeedAnnounce := (TmpOffice.TicketNum <> iTicketNum);
+          TmpOffice.TicketNum := iTicketNum;
 
           FStateTimestamp := GetTickCount64();
           IsUplinkConnected := True;
           UpdateOfficesStates();
+          if IsNeedAnnounce then
+            AnnounceTicket(TmpOffice.Num);
         end
         else
         // OFFICE 1: INFO <Caption> <TicketPrefix> <IconName> <Comment>
@@ -631,7 +682,7 @@ begin
     OfficeIterator.Init(OfficeList);
     while OfficeIterator.Next(TmpOffice) do
     begin
-      // OFFICE 1: INFO <Caption> <TicketPrefix> <IconName> <Comment>
+      // OFFICE <office_num>: INFO <Caption> <TicketPrefix> <IconName> <Comment>
       s := Format('OFFICE %d: INFO %s %s %s %s',
         [TmpOffice.Num, TmpOffice.Caption, TmpOffice.TicketPrefix,
         TmpOffice.IconName, TmpOffice.Comment]);
@@ -648,8 +699,8 @@ begin
     OfficeIterator.Init(OfficeList);
     while OfficeIterator.Next(TmpOffice) do
     begin
-      // OFFICE 1: STATE <tickets_count> [ticket_num]
-      s := Format('OFFICE %d: STATE %d', [TmpOffice.Num, TmpOffice.TicketCount]);
+      // OFFICE <office_num>: STATE <state_num> <tickets_count> [ticket_num]
+      s := Format('OFFICE %d: STATE %d %d', [TmpOffice.Num, Ord(TmpOffice.State), TmpOffice.TicketCount]);
       if TmpOffice.TicketCount > 0 then
         s := s + ' ' + IntToStr(TmpOffice.TicketNum);
       sOut := sOut + s + sLineBreak;

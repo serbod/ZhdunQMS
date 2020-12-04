@@ -21,7 +21,7 @@ type
     UDPUplink: TLUDPComponent;
     UDPListener: TLUDPComponent;
     PaintBox: TPaintBox;
-    Timer1000ms: TTimer;
+    Timer100ms: TTimer;
     procedure FormResize(Sender: TObject);
     procedure miListVoicesClick(Sender: TObject);
     procedure UDPListenerError(const msg: string; aSocket: TLSocket);
@@ -29,7 +29,7 @@ type
     procedure PaintBoxMouseUp(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Integer);
     procedure PaintBoxPaint(Sender: TObject);
-    procedure Timer1000msTimer(Sender: TObject);
+    procedure Timer100msTimer(Sender: TObject);
     procedure UDPUplinkError(const msg: string; aSocket: TLSocket);
     procedure UDPUplinkReceive(aSocket: TLSocket);
   private
@@ -51,11 +51,13 @@ type
     procedure DrawOffice(AC: TCanvas; const AOffice: TVisualOffice);
     procedure DrawButton(AC: TCanvas; const AButton: TVisualButton);
     procedure DrawTicket(AC: TCanvas; const ATicket: TVisualTicket);
+    procedure DrawFooter(AC: TCanvas);
 
     procedure ProcessClick(X, Y: Integer);
     procedure StartListener();
 
     procedure PrepareVoice();
+    procedure UpdateAppIcon();
 
     procedure OnSendCmdHandler(const ACmdText, AHostPort: string);
     procedure OnUplinkSendCmdHandler(const ACmdText, AHostPort: string);
@@ -68,6 +70,7 @@ type
     procedure UpdateView();
 
     procedure TestTickets();
+    property TicketManager: TTicketManager read FTicketManager;
   end;
 
 var
@@ -100,26 +103,28 @@ begin
 
   DrawOffice(c, vt);}
 
-  for i := Low(FTicketManager.VisualOffices) to High(FTicketManager.VisualOffices) do
+  for i := Low(TicketManager.VisualOffices) to High(TicketManager.VisualOffices) do
   begin
-    DrawOffice(c, FTicketManager.VisualOffices[i]);
+    DrawOffice(c, TicketManager.VisualOffices[i]);
   end;
 
-  if zrKiosk in FTicketManager.Roles then
+  if zrKiosk in TicketManager.Roles then
   begin
-    for i := Low(FTicketManager.VisualButtons) to High(FTicketManager.VisualButtons) do
+    for i := Low(TicketManager.VisualButtons) to High(TicketManager.VisualButtons) do
     begin
-      DrawButton(c, FTicketManager.VisualButtons[i]);
+      DrawButton(c, TicketManager.VisualButtons[i]);
     end;
 
-    if FTicketManager.VisTicket.Visible then
+    if TicketManager.VisTicket.Visible then
     begin
-      DrawTicket(c, FTicketManager.VisTicket);
+      DrawTicket(c, TicketManager.VisTicket);
     end;
   end;
+
+  DrawFooter(c);
 end;
 
-procedure TFormMonitor.Timer1000msTimer(Sender: TObject);
+procedure TFormMonitor.Timer100msTimer(Sender: TObject);
 begin
   UpdateView();
   if FNeedRestartListener then
@@ -128,7 +133,7 @@ begin
     StartListener();
   end;
 
-  FTicketManager.Tick();
+  TicketManager.Tick();
 end;
 
 procedure TFormMonitor.UDPUplinkError(const msg: string; aSocket: TLSocket);
@@ -148,7 +153,7 @@ begin
     while ss <> '' do
     begin
       s := ExtractFirstWord(ss, sLineBreak);
-      FTicketManager.ProcessCmd(s, sHostPort);
+      TicketManager.ProcessCmd(s, sHostPort);
     end;
   end;
 end;
@@ -199,7 +204,7 @@ begin
   if s <> '' then
   begin
     _LogDebug('Listener: ' + s);
-    FTicketManager.ProcessCmd(s, sHostPort);
+    TicketManager.ProcessCmd(s, sHostPort);
   end;
 end;
 
@@ -212,19 +217,19 @@ end;
 procedure TFormMonitor.AfterResize();
 begin
   // x = 10 .. (2/3) - 20
-  FTicketManager.VisOfficesArea.Left := 10;
-  FTicketManager.VisOfficesArea.Right := ((Width div 3) * 2) - 20;
+  TicketManager.VisOfficesArea.Left := 10;
+  TicketManager.VisOfficesArea.Right := ((Width div 3) * 2) - 20;
   // y = 50 .. Max-100
-  FTicketManager.VisOfficesArea.Top := 50;
-  FTicketManager.VisOfficesArea.Bottom := Height - 50;
+  TicketManager.VisOfficesArea.Top := 50;
+  TicketManager.VisOfficesArea.Bottom := Height - 50;
 
 
   // x = (2/3)+10 .. Max-10
-  FTicketManager.VisButtonsArea.Left := ((Width div 3) * 2) + 10;
-  FTicketManager.VisButtonsArea.Right := Width - 10;
+  TicketManager.VisButtonsArea.Left := ((Width div 3) * 2) + 10;
+  TicketManager.VisButtonsArea.Right := Width - 10;
   // y = 50 .. Max-100
-  FTicketManager.VisButtonsArea.Top := 50;
-  FTicketManager.VisButtonsArea.Bottom := Height - 50;
+  TicketManager.VisButtonsArea.Top := 50;
+  TicketManager.VisButtonsArea.Bottom := Height - 50;
 
 end;
 
@@ -326,6 +331,21 @@ begin
   AC.Brush.Style := bsClear;
   AC.Brush.Color := clWhite;
 
+  if AOffice.State = osLost then
+    AC.Brush.Color := clGray;
+
+  AC.Pen.Width := Min(Width div 200, Height div 200);
+  if AOffice.Marked then
+  begin
+    AC.Pen.Style := psDash;
+    AC.Pen.Color := clRed
+  end
+  else
+  begin
+    AC.Pen.Style := psSolid;
+    AC.Pen.Color := clBlack;
+  end;
+
   r := AOffice.Rect;
   //AC.FillRect(r);
   rr := Min((r.Width div 5), (r.Height div 5));
@@ -363,6 +383,8 @@ begin
   //AC.Brush.Style := bsSolid;
   AC.Brush.Style := bsClear;
   AC.Brush.Color := clWhite;
+  AC.Pen.Style := psSolid;
+  AC.Pen.Color := clBlack;
 
   r := AButton.Rect;
   //AC.FillRect(r);
@@ -435,6 +457,8 @@ begin
   //AC.Brush.Style := bsSolid;
   AC.Brush.Style := bsClear;
   AC.Brush.Color := clWhite;
+  AC.Pen.Style := psSolid;
+  AC.Pen.Color := clBlack;
 
   r := ATicket.Rect;
   rr := Min((r.Width div 5), (r.Height div 10));
@@ -508,6 +532,61 @@ begin
 
 end;
 
+procedure TFormMonitor.DrawFooter(AC: TCanvas);
+var
+  r: TRect;
+  ts: TTextStyle;
+  w: Integer;
+begin
+  if TicketManager.FooterText = '' then
+    Exit;
+
+  r.Top := Height - 50;
+  r.Bottom := Height;
+  r.Left := 0;
+  r.Width := Width;
+
+  // == background
+  AC.Brush.Style := bsClear;
+  AC.Brush.Color := clWhite;
+  AC.Pen.Style := psSolid;
+  AC.Pen.Color := clBlack;
+  AC.FillRect(r);
+
+  // text style
+  ts := AC.TextStyle;
+  ts.SingleLine := False;
+  ts.Wordbreak := True;
+  ts.Layout := tlTop;
+  ts.Alignment := taCenter;
+
+  // == text
+  AC.Brush.Style := bsClear;
+  AC.Font.Name := 'Tahoma';
+  AC.Font.Size := 28;
+  //AC.Font.Quality := fqCleartypeNatural;
+  AC.Font.Quality := fqAntialiased;
+
+  // decrease font if needed
+  w := AC.TextWidth(TicketManager.FooterText);
+  while w > (r.Width - 20) do
+  begin
+    AC.Font.Size := AC.Font.Size - 2;
+    w := AC.TextWidth(TicketManager.FooterText);
+  end;
+
+  AC.Font.Color := clLtGray;
+  AC.Font.Style := [fsBold];
+  //AC.TextOut(5, 5, FHeaderText);
+  AC.TextRect(r, r.Left+2, r.Top+2, TicketManager.FooterText, ts);
+
+  AC.Font.Color := clGray;
+  //AC.TextOut(4, 4, FHeaderText);
+  AC.TextRect(r, r.Left, r.Top, TicketManager.FooterText, ts);
+
+
+end;
+
 procedure TFormMonitor.ProcessClick(X, Y: Integer);
 var
   i: Integer;
@@ -516,24 +595,24 @@ var
   TmpTicket: TTicket;
 
 begin
-  for i := Low(FTicketManager.VisualButtons) to High(FTicketManager.VisualButtons) do
+  for i := Low(TicketManager.VisualButtons) to High(TicketManager.VisualButtons) do
   begin
-    pTmpVisButton := Addr(FTicketManager.VisualButtons[i]);
+    pTmpVisButton := Addr(TicketManager.VisualButtons[i]);
     if pTmpVisButton^.Rect.Contains(Point(X, Y)) then
     begin
-      OfficeItem := FTicketManager.OfficeList.GetByNum(pTmpVisButton^.OfficeNum);
+      OfficeItem := TicketManager.OfficeList.GetByNum(pTmpVisButton^.OfficeNum);
       if Assigned(OfficeItem) then
       begin
-        TmpTicket := FTicketManager.CreateTicket(OfficeItem.Num);
+        TmpTicket := TicketManager.CreateTicket(OfficeItem.Num);
         if Assigned(TmpTicket) then
         begin
-          FTicketManager.VisTicket.OfficeNum := TmpTicket.OfficeNum;
-          FTicketManager.VisTicket.TicketNum := TmpTicket.Num;
-          FTicketManager.VisTicket.TimeCreate := TmpTicket.TimeCreate;
+          TicketManager.VisTicket.OfficeNum := TmpTicket.OfficeNum;
+          TicketManager.VisTicket.TicketNum := TmpTicket.Num;
+          TicketManager.VisTicket.TimeCreate := TmpTicket.TimeCreate;
 
-          FTicketManager.VisTicket.OfficeText := OfficeItem.Caption;
-          FTicketManager.VisTicket.TicketText := TmpTicket.Caption;
-          FTicketManager.VisTicket.Visible := True;
+          TicketManager.VisTicket.OfficeText := OfficeItem.Caption;
+          TicketManager.VisTicket.TicketText := TmpTicket.Caption;
+          TicketManager.VisTicket.Visible := True;
         end;
       end;
     end;
@@ -542,8 +621,8 @@ end;
 
 procedure TFormMonitor.StartListener();
 begin
-  if (zrServer in FTicketManager.Roles) then
-    UDPListener.Listen(FTicketManager.UDPPort);
+  if (zrServer in TicketManager.Roles) then
+    UDPListener.Listen(TicketManager.UDPPort);
 end;
 
 procedure TFormMonitor.PrepareVoice();
@@ -569,6 +648,53 @@ begin
   //{$endif}
 end;
 
+procedure TFormMonitor.UpdateAppIcon();
+var
+  s: string;
+  TmpImg: TImage;
+  Bitmap: TBitmap;
+  TmpIcon: TIcon;
+begin
+  if zrServer in TicketManager.Roles then
+    s := 'S'
+  else if zrOperator in TicketManager.Roles then
+    s := 'O'
+  else if zrMonitor in TicketManager.Roles then
+    s := 'M'
+  else
+    s := '';
+
+  Bitmap := TBitmap.Create;
+  try
+    Bitmap.Width := Application.Icon.Width;
+    Bitmap.Height := Application.Icon.Height;
+    Bitmap.Canvas.Draw(0, 0, Application.Icon);
+
+    Bitmap.Canvas.Brush.Style := bsClear;
+    Bitmap.Canvas.Font.Name := 'Tahoma';
+    //Bitmap.Canvas.Font.Size := 8;
+    Bitmap.Canvas.Font.Size := 40;
+    Bitmap.Canvas.Font.Color := clLime;
+    Bitmap.Canvas.Font.Style := [fsBold];
+    Bitmap.Canvas.TextOut(0, 0, s);
+    Bitmap.Masked := True;
+    Bitmap.Mask(Bitmap.Canvas.Pixels[0,0]);
+
+    Application.Icon.Assign(Bitmap);
+  finally
+    Bitmap.Free;
+  end;
+
+  {TmpIcon := Application.Icon;
+  TmpIcon.Canvas.Brush.Style := bsClear;
+  TmpIcon.Canvas.Font.Name := 'Tahoma';
+  TmpIcon.Canvas.Font.Size := 16;
+  TmpIcon.Canvas.Font.Color := clGreen;
+  TmpIcon.Canvas.TextOut(0, 0, s);
+  //Application.Icon := TmpImg.Picture.Icon;   }
+  InvalidateRect(Application.Handle, nil, True);
+end;
+
 procedure TFormMonitor.OnSendCmdHandler(const ACmdText, AHostPort: string);
 begin
   if (ACmdText <> '') and (AHostPort <> '') then
@@ -581,6 +707,8 @@ procedure TFormMonitor.OnUplinkSendCmdHandler(const ACmdText,
   AHostPort: string);
 begin
   Assert(Length(ACmdText) <= 500);
+  if FTicketManager.UplinkHost = '' then Exit;
+
   if Length(ACmdText) <= 500 then
   begin
     if not (FTicketManager.IsUplinkConnected) then
@@ -654,6 +782,8 @@ begin
   else
     FBGFileName := '';
 
+  UpdateAppIcon();
+
   PrepareVoice();
   StartListener();
 
@@ -685,7 +815,7 @@ begin
     FTicketManager.CreateTicket(OfficeItem.Num);
     FTicketManager.CreateTicket(OfficeItem.Num);
 
-    OfficeItem.State := osIdle;
+    OfficeItem.State := osLost;
   end;
 
 end;

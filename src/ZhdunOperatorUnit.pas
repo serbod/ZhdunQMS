@@ -87,7 +87,7 @@ begin
     //Deleted: Boolean;
 
     Office.TicketPrefix := ini.ReadString(sSection, 'TicketPrefix', Office.TicketPrefix);
-    Office.GroupId := ini.ReadInteger(sSection, 'GroupId', Office.GroupId);
+    Office.GroupNum := ini.ReadInteger(sSection, 'GroupNum', Office.GroupNum);
 
   finally
     FreeAndNil(ini);
@@ -114,7 +114,7 @@ begin
     //Deleted: Boolean;
 
     ini.WriteString(sSection, 'TicketPrefix', Office.TicketPrefix);
-    ini.WriteInteger(sSection, 'GroupId', Office.GroupId);
+    ini.WriteInteger(sSection, 'GroupNum', Office.GroupNum);
   finally
     FreeAndNil(ini);
   end;
@@ -162,7 +162,7 @@ end;
 procedure TOperatorManager.ProcessCmd(ACmdText: string);
 var
   s, ss, sCmd: string;
-  iNum: Integer;
+  iNum, iStateNum: Integer;
   TmpOffice: TOffice;
 begin
   ss := ACmdText;
@@ -180,6 +180,11 @@ begin
       // OFFICE 1: STATE <tickets_count> [ticket_num]
       if sCmd = 'STATE' then
       begin
+        s := ExtractFirstWord(ss); // state_num
+        iStateNum := StrToIntDef(s, 0);
+        if (iStateNum >= Ord(Low(TOfficeState))) and (iStateNum <= Ord(High(TOfficeState))) then
+          Office.State := TOfficeState(iStateNum);
+
         s := ExtractFirstWord(ss); // tickets_count
         Office.TicketCount := StrToIntDef(s, 0);
 

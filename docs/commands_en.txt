@@ -21,8 +21,9 @@ Office info. Server send it to downlinks.
 
 === STATE ===
 
- STATE <tickets_count> [ticket_num]
+ STATE <state_num> <tickets_count> [ticket_num]
 
+* state_num - state number
 * tickets_count - total tickets in queue
 * ticket_num - current ticket number, optional
 

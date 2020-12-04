@@ -18,8 +18,9 @@ object FormMonitor: TFormMonitor
     OnMouseUp = PaintBoxMouseUp
     OnPaint = PaintBoxPaint
   end
-  object Timer1000ms: TTimer
-    OnTimer = Timer1000msTimer
+  object Timer100ms: TTimer
+    Interval = 100
+    OnTimer = Timer100msTimer
     Left = 240
     Top = 77
   end

@@ -109,7 +109,7 @@ end;
 
 procedure TFormOperator.UDPConnError(const msg: string; aSocket: TLSocket);
 begin
-  Log.LogError(msg, '');
+  _LogError(msg);
 end;
 
 procedure TFormOperator.UDPConnReceive(aSocket: TLSocket);
@@ -119,7 +119,7 @@ begin
   aSocket.GetMessage(s);
   if s <> '' then
   begin
-    Log.LogStatus(s, '');
+    _LogDebug(s);
     FOperatorManager.ProcessCmd(s);
   end;
 end;
@@ -141,7 +141,7 @@ begin
     //res := UdpConn.SendMessage(S, FOperatorManager.UplinkHost + ':' + IntToStr(FOperatorManager.UplinkPort));
     res := UdpConn.SendMessage(S);
     if res = 0 then
-      Log.LogError('SendMessage=0', '');
+      _LogError('SendMessage=0');
   end;
 end;
 

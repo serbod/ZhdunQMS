@@ -18,7 +18,7 @@ begin
   setHeapTraceOutput('operator_trace.log'); // supported as of debugger version 3.2.0
   {$endIf}
   RequireDerivedFormResource := True;
-  Application.Scaled := True;
+  Application.Scaled:=True;
   Application.Initialize;
   Application.CreateForm(TFormOperator, FormOperator);
   Application.Run;

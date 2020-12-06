@@ -7,7 +7,7 @@ interface
 uses
   Classes, SysUtils, Forms, Controls, Graphics, Dialogs, ExtCtrls, ActnList,
   Menus, StdCtrls, lNetComponents, ZhdunItems, ZhdunOperatorUnit, lNet, RFUtils,
-  logger;
+  LCLTranslator, logger;
 
 type
 
@@ -39,6 +39,7 @@ type
     procedure actExitExecute(Sender: TObject);
     procedure actNextTicketExecute(Sender: TObject);
     procedure actPauseExecute(Sender: TObject);
+    procedure actSettingsExecute(Sender: TObject);
     procedure Timer100msTimer(Sender: TObject);
     procedure Timer1sTimer(Sender: TObject);
     procedure UDPConnError(const msg: string; aSocket: TLSocket);
@@ -83,6 +84,11 @@ end;
 procedure TFormOperator.actPauseExecute(Sender: TObject);
 begin
   FOperatorManager.Pause();
+end;
+
+procedure TFormOperator.actSettingsExecute(Sender: TObject);
+begin
+  SetDefaultLang('ru');
 end;
 
 procedure TFormOperator.Timer100msTimer(Sender: TObject);
@@ -156,6 +162,7 @@ begin
   //UdpConn.Connect(FOperatorManager.UplinkHost, FOperatorManager.UplinkPort);
 
   TrayIcon.Icon.Assign(Application.Icon);
+  SetDefaultLang('ru');
 
   FOperatorManager.PostCmd('INFO_REQ');
 end;

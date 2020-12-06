@@ -1,0 +1,33 @@
+msgid ""
+msgstr "Content-Type: text/plain; charset=UTF-8"
+
+#: tformoperator.actnextticket.caption
+msgid "Next visitor!"
+msgstr "Следующий!"
+
+#: tformoperator.actpause.caption
+msgid "Pause"
+msgstr "Перерыв"
+
+#: tformoperator.actsettings.caption
+#, fuzzy
+#| msgid "Настройки"
+msgid "Settings"
+msgstr "Settings"
+
+#: tformoperator.caption
+msgid "Zhdun"
+msgstr "Ждун"
+
+#: tformoperator.lbcurticketlabel.caption
+msgid "Current ticket"
+msgstr "Текущий талон"
+
+#: tformoperator.lbtotalticketslabel.caption
+msgid "Total tickets"
+msgstr "В очереди"
+
+#: tformoperator.pannolink.caption
+msgid "CHECK CONNECTION"
+msgstr "ПРОВЕРЬТЕ СВЯЗЬ"
+

@@ -1,0 +1,31 @@
+msgid ""
+msgstr "Content-Type: text/plain; charset=UTF-8"
+
+#: tformoperator.actnextticket.caption
+msgid "Next visitor!"
+msgstr ""
+
+#: tformoperator.actpause.caption
+msgid "Pause"
+msgstr ""
+
+#: tformoperator.actsettings.caption
+msgid "Settings"
+msgstr ""
+
+#: tformoperator.caption
+msgid "Zhdun"
+msgstr ""
+
+#: tformoperator.lbcurticketlabel.caption
+msgid "Current ticket"
+msgstr ""
+
+#: tformoperator.lbtotalticketslabel.caption
+msgid "Total tickets"
+msgstr ""
+
+#: tformoperator.pannolink.caption
+msgid "CHECK CONNECTION"
+msgstr ""
+

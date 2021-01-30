@@ -7,7 +7,7 @@ uses
   cthreads,
   {$ENDIF}{$ENDIF}
   Interfaces, // this includes the LCL widgetset
-  Forms, lnetvisual, OperatorForm, ZhdunOperatorUnit
+  Forms, lnetvisual, OperatorForm, ZhdunOperatorUnit, ConfigForm
   { you can add units after this };
 
 {$R *.res}
@@ -21,6 +21,7 @@ begin
   Application.Scaled:=True;
   Application.Initialize;
   Application.CreateForm(TFormOperator, FormOperator);
+  Application.CreateForm(TfrmOptions, frmOptions);
   Application.Run;
 end.
 

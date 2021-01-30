@@ -1,0 +1,141 @@
+object frmOptions: TfrmOptions
+  Left = 403
+  Height = 461
+  Top = 260
+  Width = 753
+  Caption = 'Settings'
+  ClientHeight = 461
+  ClientWidth = 753
+  Font.Height = -13
+  Font.Name = 'Tahoma'
+  OnCreate = FormCreate
+  OnDestroy = FormDestroy
+  OnShow = FormShow
+  object tvOptions: TTreeView
+    Left = 14
+    Height = 400
+    Top = 14
+    Width = 202
+    PopupMenu = pmOptions
+    ReadOnly = True
+    RowSelect = True
+    ScrollBars = ssAutoVertical
+    TabOrder = 0
+    OnSelectionChanged = tvOptionsSelectionChanged
+    Options = [tvoAutoItemHeight, tvoHideSelection, tvoKeepCollapsedNodes, tvoReadOnly, tvoRowSelect, tvoShowButtons, tvoShowLines, tvoShowRoot, tvoToolTips, tvoThemedDraw]
+  end
+  object gbParams: TGroupBox
+    Left = 224
+    Height = 400
+    Top = 14
+    Width = 520
+    Anchors = [akTop, akLeft, akRight]
+    Caption = 'Parameters'
+    ClientHeight = 379
+    ClientWidth = 516
+    TabOrder = 1
+    object lvParams: TListView
+      Left = 8
+      Height = 296
+      Top = 2
+      Width = 502
+      Anchors = [akTop, akLeft, akRight]
+      AutoWidthLastColumn = True
+      Columns = <      
+        item
+          Caption = 'Parameter'
+          Width = 300
+        end      
+        item
+          Caption = 'Value'
+          Width = 150
+        end>
+      GridLines = True
+      ReadOnly = True
+      RowSelect = True
+      ScrollBars = ssAutoVertical
+      TabOrder = 0
+      ViewStyle = vsReport
+      OnSelectItem = lvParamsSelectItem
+    end
+    object btnSet: TButton
+      Left = 454
+      Height = 26
+      Top = 328
+      Width = 56
+      Anchors = [akTop, akRight]
+      Caption = 'Reset'
+      OnClick = btnSetClick
+      TabOrder = 1
+    end
+    object lbParamName: TLabel
+      Left = 11
+      Height = 16
+      Top = 309
+      Width = 407
+      AutoSize = False
+      Caption = 'Parameter name'
+      ParentColor = False
+    end
+    object cbValue: TComboBox
+      Left = 8
+      Height = 24
+      Top = 330
+      Width = 438
+      Anchors = [akTop, akLeft, akRight]
+      ItemHeight = 16
+      OnChange = edValueChange
+      OnKeyDown = edValueKeyDown
+      TabOrder = 2
+    end
+  end
+  object btnCancel: TBitBtn
+    Left = 669
+    Height = 30
+    Top = 422
+    Width = 75
+    Anchors = [akTop, akRight]
+    Cancel = True
+    DefaultCaption = True
+    Kind = bkCancel
+    ModalResult = 2
+    OnClick = btnCancelClick
+    TabOrder = 2
+  end
+  object btnOk: TBitBtn
+    Left = 592
+    Height = 30
+    Top = 422
+    Width = 75
+    Anchors = [akTop, akRight]
+    DefaultCaption = True
+    Kind = bkOK
+    ModalResult = 1
+    OnClick = btnOkClick
+    TabOrder = 3
+  end
+  object btnApply: TBitBtn
+    Left = 14
+    Height = 30
+    Top = 422
+    Width = 75
+    DefaultCaption = True
+    Kind = bkRetry
+    ModalResult = 4
+    OnClick = btnApplyClick
+    TabOrder = 4
+  end
+  object pmOptions: TPopupMenu
+    OnPopup = pmOptionsPopup
+    Left = 104
+    Top = 73
+    object miAddSubitem: TMenuItem
+      Caption = 'Add subitem'
+      OnClick = miAddSubitemClick
+    end
+    object miDeleteSubitem: TMenuItem
+      Caption = 'Delete subitem'
+      OnClick = miDeleteSubitemClick
+    end
+  end
+end

@@ -1,3 +1,12 @@
+{ ZhdunQMS (C) Sergey Bodrov, 2020
+
+Operator workplace
+
+- autoconnecting to uplink
+- show current ticket number and number of tickets awaiting in queue
+- tray icon with actions menu
+
+}
 unit OperatorForm;
 
 {$mode objfpc}{$H+}
@@ -7,7 +16,7 @@ interface
 uses
   Classes, SysUtils, Forms, Controls, Graphics, Dialogs, ExtCtrls, ActnList,
   Menus, StdCtrls, lNetComponents, ZhdunItems, ZhdunOperatorUnit, lNet, RFUtils,
-  LCLTranslator, logger;
+  LCLTranslator, logger, ConfigForm;
 
 type
 
@@ -88,7 +97,9 @@ end;
 
 procedure TFormOperator.actSettingsExecute(Sender: TObject);
 begin
-  SetDefaultLang('ru');
+  //SetDefaultLang('ru');
+  frmOptions.ConfFileName := 'zhdun.ini';
+  frmOptions.Show();
 end;
 
 procedure TFormOperator.Timer100msTimer(Sender: TObject);

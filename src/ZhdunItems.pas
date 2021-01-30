@@ -1,4 +1,4 @@
-{ Copyright: Sergey Bodrov, 2020 }
+{ ZhdunQMS (C) Sergey Bodrov, 2020 }
 unit ZhdunItems;
 
 {$mode objfpc}{$H+}

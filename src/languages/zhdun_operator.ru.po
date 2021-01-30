@@ -10,10 +10,9 @@ msgid "Pause"
 msgstr "Перерыв"
 
 #: tformoperator.actsettings.caption
-#, fuzzy
-#| msgid "Настройки"
+msgctxt "tformoperator.actsettings.caption"
 msgid "Settings"
-msgstr "Settings"
+msgstr "Настройки"
 
 #: tformoperator.caption
 msgid "Zhdun"
@@ -30,4 +29,38 @@ msgstr "В очереди"
 #: tformoperator.pannolink.caption
 msgid "CHECK CONNECTION"
 msgstr "ПРОВЕРЬТЕ СВЯЗЬ"
+
+#: tfrmoptions.btnset.caption
+msgid "Reset"
+msgstr "Сброс"
+
+#: tfrmoptions.caption
+#, fuzzy
+msgctxt "tfrmoptions.caption"
+msgid "Settings"
+msgstr "Настройки"
+
+#: tfrmoptions.gbparams.caption
+msgid "Parameters"
+msgstr "Параметры"
+
+#: tfrmoptions.lbparamname.caption
+msgid "Parameter name"
+msgstr "Название параметра"
+
+#: tfrmoptions.lvparams.columns[0].caption
+msgid "Parameter"
+msgstr "Параметр"
+
+#: tfrmoptions.lvparams.columns[1].caption
+msgid "Value"
+msgstr "Значение"
+
+#: tfrmoptions.miaddsubitem.caption
+msgid "Add subitem"
+msgstr "Добавить подраздел"
+
+#: tfrmoptions.mideletesubitem.caption
+msgid "Delete subitem"
+msgstr "Удалить подраздел"
 

@@ -10,6 +10,7 @@ msgid "Pause"
 msgstr ""
 
 #: tformoperator.actsettings.caption
+msgctxt "tformoperator.actsettings.caption"
 msgid "Settings"
 msgstr ""
 
@@ -27,5 +28,38 @@ msgstr ""
 
 #: tformoperator.pannolink.caption
 msgid "CHECK CONNECTION"
+msgstr ""
+
+#: tfrmoptions.btnset.caption
+msgid "Reset"
+msgstr ""
+
+#: tfrmoptions.caption
+msgctxt "tfrmoptions.caption"
+msgid "Settings"
+msgstr ""
+
+#: tfrmoptions.gbparams.caption
+msgid "Parameters"
+msgstr ""
+
+#: tfrmoptions.lbparamname.caption
+msgid "Parameter name"
+msgstr ""
+
+#: tfrmoptions.lvparams.columns[0].caption
+msgid "Parameter"
+msgstr ""
+
+#: tfrmoptions.lvparams.columns[1].caption
+msgid "Value"
+msgstr ""
+
+#: tfrmoptions.miaddsubitem.caption
+msgid "Add subitem"
+msgstr ""
+
+#: tfrmoptions.mideletesubitem.caption
+msgid "Delete subitem"
 msgstr ""
 

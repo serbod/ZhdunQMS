@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CONFIG>
   <ProjectOptions>
-    <Version Value="11"/>
+    <Version Value="12"/>
     <PathDelim Value="\"/>
     <General>
+      <Flags>
+        <CompatibilityMode Value="True"/>
+      </Flags>
       <SessionStorage Value="InProjectDir"/>
-      <MainUnit Value="0"/>
       <Title Value="zhdun_monitor"/>
       <Scaled Value="True"/>
       <ResourceType Value="res"/>
@@ -56,7 +58,6 @@
     </PublishOptions>
     <RunParams>
       <FormatVersion Value="2"/>
-      <Modes Count="0"/>
     </RunParams>
     <RequiredPackages Count="2">
       <Item1>
@@ -121,7 +122,6 @@
       <Debugging>
         <DebugInfoType Value="dsDwarf2Set"/>
         <TrashVariables Value="True"/>
-        <UseExternalDbgSyms Value="True"/>
       </Debugging>
       <Options>
         <Win32>

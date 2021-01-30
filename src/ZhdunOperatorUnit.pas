@@ -1,3 +1,4 @@
+{ ZhdunQMS (C) Sergey Bodrov, 2020 }
 unit ZhdunOperatorUnit;
 
 {$mode objfpc}{$H+}

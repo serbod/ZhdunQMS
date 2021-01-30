@@ -6,7 +6,6 @@ object FormOperator: TFormOperator
   Caption = 'Zhdun'
   ClientHeight = 152
   ClientWidth = 386
-  LCLVersion = '2.1.0.0'
   object Button1: TButton
     Left = 216
     Height = 33

@@ -1,3 +1,4 @@
+{ ZhdunQMS (C) Sergey Bodrov, 2020 }
 unit MonitorForm;
 
 {$mode objfpc}{$H+}
@@ -76,7 +77,7 @@ type
 var
   FormMonitor: TFormMonitor;
 
-const
+resourcestring
   csHeaderText = 'СУО "Ждун" 2020 (С) serbod.com';
   csTicketNoteText = 'Запишите номер билета';
 
@@ -678,7 +679,7 @@ begin
     Bitmap.Canvas.Font.Style := [fsBold];
     Bitmap.Canvas.TextOut(0, 0, s);
     Bitmap.Masked := True;
-    Bitmap.Mask(Bitmap.Canvas.Pixels[0,0]);
+    Bitmap.Mask(Bitmap.Canvas.Pixels[0, 0]);
 
     Application.Icon.Assign(Bitmap);
   finally
